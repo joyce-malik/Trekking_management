@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trekking Management Application</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body class="bg-light">
+
+    <div id="app" class="container mt-5">
+        <div v-if="!token">
+            <h3 style="color: red;">{{ errorMessage }}</h3>
+            <h3 style="color: green;">{{ successMessage }}</h3>
+
+            <div v-if="!isRegistering">
+                <h2>Login</h2>
+                <form @submit.prevent="login">
+                    <input type="email" v-model="email" placeholder="Email" required>
+                    <input type="password" v-model="password" placeholder="Password" required>
+                    <button type="submit">Login</button>
+                </form>
+                <button @click="isRegistering = true">Don't have an account? Register</button>
+            </div>
+
+            <div v-else>
+                <h2>Trekker Registration</h2>
+                <form @submit.prevent="register">
+                    <input v-model="reg.name" placeholder="Full Name" required>
+                    <input type="email" v-model="reg.email" placeholder="Email" required>
+                    <input type="password" v-model="reg.password" placeholder="Password" required>
+                    <input v-model="reg.phone" placeholder="Phone">
+                    <input v-model="reg.city" placeholder="City">
+                    <button type="submit">Register</button>
+                </form>
+                <button @click="isRegistering = false">Back to Login</button>
+            </div>
+        </div>
+
+        <div v-else>
+            <button @click="logout" style="float: right;">Logout</button>
+            <h2>Dashboard ({{ role }})</h2>
+            
+            <button v-if="role === 'trekker'" @click="exportHistory">Export My History (CSV)</button>
+
+            <div v-if="role === 'admin'" style="border: 1px solid black; padding: 10px; margin-bottom: 20px;">
+                <h3>Create New Trek</h3>
+                <form @submit.prevent="createTrek">
+                    <input v-model="newTrek.name" placeholder="Trek Name" required>
+                    <input v-model="newTrek.location" placeholder="Location" required>
+                    <input v-model="newTrek.difficulty" placeholder="Difficulty" required>
+                    <input type="number" v-model="newTrek.duration" placeholder="Duration (Days)" required>
+                    <input type="number" v-model="newTrek.total_capacity" placeholder="Capacity" required>
+                    <input type="date" v-model="newTrek.start_date" required>
+                    <input type="date" v-model="newTrek.end_date" required>
+                    <button type="submit">Add Trek</button>
+                </form>
+            </div>
+
+            <h3>Available Treks</h3>
+            <ul>
+                <li v-for="t in treks" :key="t.id" style="margin-bottom: 10px;">
+                    <strong>{{ t.name }}</strong> ({{ t.location }}) | 
+                    Diff: {{ t.difficulty }} | Slots: {{ t.available_slots }}
+                    
+                    <button v-if="role === 'trekker' && t.available_slots > 0" @click="bookTrek(t.id)">
+                        Book Now
+                    </button>
+                    <span v-if="t.available_slots <= 0" style="color: red;">FULL</span>
+                </li>
+            </ul>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

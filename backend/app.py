@@ -4,11 +4,14 @@ from flask_jwt_extended import JWTManager, create_access_token
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Trek, Booking
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_jwt_extended import get_jwt_identity
 from celery import Celery
+from celery.schedules import crontab
 import csv
 import os
+import json
+import redis
 
 
 
@@ -23,6 +26,9 @@ app.config['JWT_SECRET_KEY'] = "I_rather_keep_it_stupid_simple-this-is-gonna-be-
 db.init_app(app)
 CORS(app)
 jwt = JWTManager(app)
+
+# Initialize Redis for caching (using database 1 to keep it separate from Celery on db 0)
+cache = redis.Redis(host='localhost', port=6379, db=1, decode_responses=True)
 
 # Database Seeding: The Programmatic Admin
 def setup_database():
@@ -72,11 +78,13 @@ def create_trek():
             total_capacity=data['total_capacity'],
             available_slots=data['total_capacity'], # initially matches total capacity
             start_date=start,
-            end_date=end
+            end_date=end,
+            status='Open'
         )
         
         db.session.add(new_trek)
         db.session.commit()
+        cache.delete('all_treks')
         return jsonify({"msg": "Trek created successfully", "id": new_trek.id}), 201
         
     except Exception as e:
@@ -85,10 +93,14 @@ def create_trek():
 
 @app.route('/api/treks', methods=['GET'])
 def get_treks():
-    # Returns all treks (you can add filters here later)
+    # 1. Check Redis Cache First
+    cached_treks = cache.get('all_treks')
+    if cached_treks:
+        return jsonify(json.loads(cached_treks)), 200
+    
+    # 2. If not in cache, query the database
     treks = Trek.query.all()
     results = []
-    
     for t in treks:
         results.append({
             "id": t.id,
@@ -99,9 +111,13 @@ def get_treks():
             "available_slots": t.available_slots,
             "status": t.status,
             "start_date": t.start_date.strftime('%Y-%m-%d'),
-            "end_date": t.end_date.strftime('%Y-%m-%d')
+            "end_date": t.end_date.strftime('%Y-%m-%d'),
+            "staff_id": t.staff_id
         })
         
+    # 3. Save to Redis with a 60-second expiration (satisfies rubric requirement)
+    cache.setex('all_treks', 60, json.dumps(results))
+    
     return jsonify(results), 200
 
 @app.route('/api/login', methods=['POST'])
@@ -113,19 +129,25 @@ def login():
     user = User.query.filter_by(email=email).first()
 
     if user and check_password_hash(user.password_hash, password):
+        if not user.is_active:
+            return jsonify({"msg": "Account deactivated. Please contact support."}), 403
+            
         # Bake the user's role and ID directly into the token payload
         access_token = create_access_token(
-            identity=user.id, 
+            identity=str(user.id), 
             additional_claims={"role": user.role, "name": user.name}
         )
-        return jsonify(access_token=access_token, role=user.role, name=user.name), 200
+        return jsonify(access_token=access_token, role=user.role, name=user.name, user_id=user.id), 200
 
     return jsonify({"msg": "Bad email or password"}), 401
 
 @app.route('/api/register', methods=['POST'])
 def register():
     data = request.get_json()
-    
+    required = ['email', 'password', 'name']
+    if not data or any(f not in data or not data[f] for f in required):
+        return jsonify({"msg": "Missing required fields"}), 400
+        
     # Check if email already exists
     if User.query.filter_by(email=data['email']).first():
         return jsonify({"msg": "Email already registered"}), 400
@@ -135,7 +157,7 @@ def register():
         email=data['email'],
         password_hash=hashed_pw,
         role='trekker', # Hardcoded because only trekkers self-register
-        name=data.get('name'),
+        name=data['name'],
         phone=data.get('phone', ''),
         city=data.get('city', '')
     )
@@ -145,34 +167,184 @@ def register():
     
     return jsonify({"msg": "Registration successful! You can now log in."}), 201
 
+@app.route('/api/staff', methods=['POST'])
+@jwt_required()
+def create_staff():
+    # Only Admin can create staff
+    if get_jwt().get("role") != "admin":
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    data = request.get_json()
+    required = ['email', 'password', 'name']
+    if not data or any(f not in data or not data[f] for f in required):
+        return jsonify({"msg": "Missing required fields"}), 400
+    
+    if User.query.filter_by(email=data['email']).first():
+        return jsonify({"msg": "Email already exists"}), 400
+
+    new_staff = User(
+        email=data['email'],
+        password_hash=generate_password_hash(data['password']),
+        role='staff',
+        name=data['name']
+    )
+    
+    db.session.add(new_staff)
+    db.session.commit()
+    
+    return jsonify({"msg": "Trek Staff created successfully!"}), 201
+
 @app.route('/api/book/<int:trek_id>', methods=['POST'])
 @jwt_required()
 def book_trek(trek_id):
-    user_id = get_jwt_identity()
-    trek = Trek.query.get(trek_id)
+    user_id = int(get_jwt_identity())
     
-    if not trek or trek.available_slots <= 0:
-        return jsonify({"msg": "Trek full or not found"}), 400
-        
     # Check for duplicate booking
     existing = Booking.query.filter_by(user_id=user_id, trek_id=trek_id).first()
     if existing:
         return jsonify({"msg": "You already booked this"}), 400
         
-    trek.available_slots -= 1
+    updated = Trek.query.filter(Trek.id == trek_id, Trek.available_slots > 0)\
+        .update({Trek.available_slots: Trek.available_slots - 1})
+    db.session.commit()
+    
+    if not updated:
+        return jsonify({"msg": "Trek full or not found"}), 400
+        
     new_booking = Booking(user_id=user_id, trek_id=trek_id)
     db.session.add(new_booking)
     db.session.commit()
+    cache.delete('all_treks')
     
     return jsonify({"msg": "Successfully booked!"}), 200
 
+# --- ADMIN ROUTE: Get Staff List ---
+@app.route('/api/staff_list', methods=['GET'])
+@jwt_required()
+def get_staff_list():
+    if get_jwt().get("role") != "admin":
+        return jsonify({"msg": "Unauthorized"}), 403
+    staff = User.query.filter_by(role='staff').all()
+    return jsonify([{"id": s.id, "name": s.name, "email": s.email} for s in staff]), 200
+
+# --- ADMIN ROUTE: Assign Staff to Trek ---
+@app.route('/api/treks/<int:trek_id>/assign', methods=['PUT'])
+@jwt_required()
+def assign_staff(trek_id):
+    if get_jwt().get("role") != "admin":
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    data = request.get_json()
+    trek = Trek.query.get(trek_id)
+    
+    if not trek:
+        return jsonify({"msg": "Trek not found"}), 404
+        
+    trek.staff_id = data.get('staff_id')
+    db.session.commit()
+    cache.delete('all_treks')
+    return jsonify({"msg": "Staff assigned successfully!"}), 200
+
+# --- ADMIN ROUTE: View All Users & Staff ---
+@app.route('/api/users', methods=['GET'])
+@jwt_required()
+def get_all_users():
+    if get_jwt().get("role") != "admin":
+        return jsonify({"msg": "Unauthorized"}), 403
+    
+    # Get everyone except the admin
+    users = User.query.filter(User.role != 'admin').all()
+    results = [{"id": u.id, "name": u.name, "email": u.email, "role": u.role, "is_active": u.is_active} for u in users]
+    return jsonify(results), 200
+
+# --- ADMIN ROUTE: Deactivate/Activate User ---
+@app.route('/api/users/<int:user_id>/toggle', methods=['PUT'])
+@jwt_required()
+def toggle_user_active(user_id):
+    if get_jwt().get("role") != "admin":
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+        
+    user.is_active = not user.is_active
+    db.session.commit()
+    
+    status = "activated" if user.is_active else "deactivated"
+    return jsonify({"msg": f"User {status} successfully."}), 200
+
+# --- ADMIN ROUTE: Delete Trek ---
+@app.route('/api/treks/<int:trek_id>', methods=['DELETE'])
+@jwt_required()
+def delete_trek(trek_id):
+    if get_jwt().get("role") != "admin":
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    trek = Trek.query.get(trek_id)
+    if not trek:
+        return jsonify({"msg": "Trek not found"}), 404
+        
+    db.session.delete(trek)
+    db.session.commit()
+    
+    # Flush cache so deleted trek disappears instantly
+    cache.delete('all_treks')
+    return jsonify({"msg": "Trek removed successfully."}), 200
+
+# --- STAFF ROUTE: Update Trek Status ---
+@app.route('/api/treks/<int:trek_id>/status', methods=['PUT'])
+@jwt_required()
+def update_status(trek_id):
+    if get_jwt().get("role") != "staff":
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    user_id = int(get_jwt_identity())
+    trek = Trek.query.get(trek_id)
+    
+    # Ensure this staff member actually owns this trek
+    if not trek or trek.staff_id != user_id:
+        return jsonify({"msg": "Unauthorized to edit this trek"}), 403
+        
+    data = request.get_json()
+    if 'status' in data:
+        trek.status = data['status'] # e.g., 'Open', 'Closed', 'Completed'
+    
+    db.session.commit()
+    cache.delete('all_treks')
+    return jsonify({"msg": "Trek status updated to " + trek.status}), 200
+
+# --- USER ROUTE: Booking History ---
+@app.route('/api/history', methods=['GET'])
+@jwt_required()
+def get_history():
+    user_id = int(get_jwt_identity())
+    bookings = Booking.query.filter_by(user_id=user_id).all()
+    results = [{"id": b.id, "trek_name": b.trek.name, "date": b.booking_date.strftime('%Y-%m-%d'), "status": b.status} for b in bookings]
+    return jsonify(results), 200
+
+# --- ADMIN ROUTE: Statistics ---
+@app.route('/api/stats', methods=['GET'])
+@jwt_required()
+def get_stats():
+    if get_jwt().get("role") != "admin":
+        return jsonify({"msg": "Unauthorized"}), 403
+    return jsonify({
+        "total_treks": Trek.query.count(),
+        "total_users": User.query.filter_by(role='trekker').count(),
+        "total_bookings": Booking.query.count()
+    }), 200
+
 # --- CELERY CONFIG ---
-app.config['CELERY_BROKER_URL'] = 'redis://localhost:6379/0'
-app.config['CELERY_RESULT_BACKEND'] = 'redis://localhost:6379/0'
+app.config['broker_url'] = 'redis://localhost:6379/0'
+app.config['result_backend'] = 'redis://localhost:6379/0'
 
 def make_celery(app):
-    celery = Celery(app.import_name, broker=app.config['CELERY_BROKER_URL'])
-    celery.conf.update(app.config)
+    celery = Celery(app.import_name, broker=app.config['broker_url'])
+    celery.conf.update(
+        broker_url=app.config['broker_url'],
+        result_backend=app.config['result_backend']
+    )
     class ContextTask(celery.Task):
         def __call__(self, *args, **kwargs):
             with app.app_context():
@@ -182,10 +354,68 @@ def make_celery(app):
 
 celery = make_celery(app)
 
+# --- CELERY BEAT SCHEDULE ---
+celery.conf.timezone = 'Asia/Kolkata'
+
+celery.conf.beat_schedule = {
+    'daily-reminders': {
+        'task': 'app.send_daily_reminders',
+        # Runs every day at 8:00 AM
+        'schedule': crontab(hour=8, minute=0), 
+    },
+    'monthly-activity-report': {
+        'task': 'app.send_monthly_report',
+        # Runs on the 1st of every month at midnight
+        'schedule': crontab(day_of_month='1', hour=0, minute=0), 
+    }
+}
+
+# --- SCHEDULED TASKS LOGIC ---
+
+@celery.task(name='app.send_daily_reminders')
+def send_daily_reminders():
+    # Find treks starting exactly tomorrow
+    tomorrow = datetime.utcnow() + timedelta(days=1)
+    
+    # Query database for matching treks
+    treks = Trek.query.filter(db.func.date(Trek.start_date) == tomorrow.date()).all()
+    
+    for trek in treks:
+        for booking in trek.bookings:
+            print(f"[MAIL SIMULATION] To: {booking.trekker.email} - REMINDER: Your trek '{trek.name}' starts tomorrow at {trek.location}!")
+            
+    return "Daily reminders processed."
+
+@celery.task(name='app.send_monthly_report')
+def send_monthly_report():
+    admin = User.query.filter_by(role='admin').first()
+    if not admin:
+        return "No admin user found to send report to."
+        
+    # Generate statistics
+    total_treks = Trek.query.count()
+    total_users = User.query.filter_by(role='trekker').count()
+    total_bookings = Booking.query.count()
+    
+    # Generate HTML report
+    html_content = f"""
+    <html>
+        <body>
+            <h2>TMA Monthly Activity Report</h2>
+            <p><strong>Total Treks Created:</strong> {total_treks}</p>
+            <p><strong>Total Registered Trekkers:</strong> {total_users}</p>
+            <p><strong>Total Bookings Processed:</strong> {total_bookings}</p>
+        </body>
+    </html>
+    """
+    
+    print(f"[MAIL SIMULATION] To: {admin.email} - Subject: Your Monthly TMA Report\n{html_content}")
+    return "Monthly report processed."
+
 
 # --- ASYNC TASKS ---
 
-@celery.task
+@celery.task(name='app.export_bookings_csv')
 def export_bookings_csv(user_id):
     # Ensure exports folder exists
     if not os.path.exists('exports'):
@@ -205,7 +435,7 @@ def export_bookings_csv(user_id):
 @app.route('/api/export', methods=['POST'])
 @jwt_required()
 def trigger_export():
-    user_id = get_jwt_identity()
+    user_id = int(get_jwt_identity())
     # .delay() pushes it to the Redis queue instead of locking up the server
     task = export_bookings_csv.delay(user_id)
     return jsonify({"msg": "Export started", "task_id": task.id}), 202

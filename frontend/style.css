@@ -1,0 +1,39 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f4f7f6;
+    color: #333;
+}
+
+/* Custom Trekking Colors */
+.bg-forest { background-color: #2b5329 !important; }
+.text-forest { color: #2b5329 !important; }
+.btn-energetic { 
+    background-color: #ff6b35; 
+    color: white; 
+    font-weight: 600;
+    border: none;
+}
+.btn-energetic:hover {
+    background-color: #e55a2b;
+    color: white;
+}
+
+/* Card Hover Effects */
+.trek-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border: none;
+    border-radius: 12px;
+}
+.trek-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+}
+
+.status-badge {
+    font-size: 0.8rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}

@@ -2,78 +2,267 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Trekking Management Application</title>
+    <meta name="viewport" class="form-control" content="width=device-width, initial-scale=1.0">
+    <title>TMA - Adventure Awaits</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
 </head>
 <body class="bg-light">
+    <div id="app">
+        <!-- Navigation bar -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-forest shadow-sm">
+            <div class="container">
+                <span class="navbar-brand fw-bold">⛰️ TMA Explorer</span>
+                <div class="d-flex" v-if="token">
+                    <span class="navbar-text text-white me-3">Role: <strong>{{ role.toUpperCase() }}</strong></span>
+                    <button @click="logout" class="btn btn-sm btn-outline-light">Logout</button>
+                </div>
+            </div>
+        </nav>
 
-    <div id="app" class="container mt-5">
-        <div v-if="!token">
-            <h3 style="color: red;">{{ errorMessage }}</h3>
-            <h3 style="color: green;">{{ successMessage }}</h3>
+        <div class="container mt-5">
+            <!-- Messages alerts -->
+            <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+            <div v-if="successMessage" class="alert alert-success">{{ successMessage }}</div>
 
-            <div v-if="!isRegistering">
-                <h2>Login</h2>
-                <form @submit.prevent="login">
-                    <input type="email" v-model="email" placeholder="Email" required>
-                    <input type="password" v-model="password" placeholder="Password" required>
-                    <button type="submit">Login</button>
-                </form>
-                <button @click="isRegistering = true">Don't have an account? Register</button>
+            <!-- Login / Registration Block -->
+            <div v-if="!token" class="row justify-content-center">
+                <div class="col-md-5">
+                    <div class="card trek-card shadow p-4">
+                        <h2 class="fw-bold text-forest mb-4">{{ isRegistering ? 'Join the Trail' : 'Welcome Back' }}</h2>
+                        
+                        <form v-if="!isRegistering" @submit.prevent="login">
+                            <input type="email" class="form-control mb-3" v-model="email" placeholder="Email" required>
+                            <input type="password" class="form-control mb-3" v-model="password" placeholder="Password" required>
+                            <button type="submit" class="btn btn-energetic w-100">Login</button>
+                        </form>
+
+                        <form v-else @submit.prevent="register">
+                            <input class="form-control mb-3" v-model="reg.name" placeholder="Full Name" required>
+                            <input type="email" class="form-control mb-3" v-model="reg.email" placeholder="Email" required>
+                            <input type="password" class="form-control mb-3" v-model="reg.password" placeholder="Password" required>
+                            <input class="form-control mb-3" v-model="reg.phone" placeholder="Phone">
+                            <input class="form-control mb-3" v-model="reg.city" placeholder="City">
+                            <button type="submit" class="btn btn-forest bg-forest text-white w-100">Register</button>
+                        </form>
+                        
+                        <button class="btn btn-link mt-3 p-0" @click="isRegistering = !isRegistering">
+                            {{ isRegistering ? 'Already have an account? Login' : "Don't have an account? Register" }}
+                        </button>
+                    </div>
+                </div>
             </div>
 
+            <!-- Main App Content (Dashboard) -->
             <div v-else>
-                <h2>Trekker Registration</h2>
-                <form @submit.prevent="register">
-                    <input v-model="reg.name" placeholder="Full Name" required>
-                    <input type="email" v-model="reg.email" placeholder="Email" required>
-                    <input type="password" v-model="reg.password" placeholder="Password" required>
-                    <input v-model="reg.phone" placeholder="Phone">
-                    <input v-model="reg.city" placeholder="City">
-                    <button type="submit">Register</button>
-                </form>
-                <button @click="isRegistering = false">Back to Login</button>
+                
+                <!-- Admin Stats Section -->
+                <div v-if="role === 'admin'" class="row mb-5 text-center">
+                    <div class="col-md-4">
+                        <div class="card shadow-sm p-3 bg-white border-0 border-start border-primary border-4 fw-bold text-forest">
+                            <small class="text-muted d-block text-uppercase">Total Treks</small>
+                            <span class="fs-3">{{ stats.total_treks }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card shadow-sm p-3 bg-white border-0 border-start border-success border-4 fw-bold text-forest">
+                            <small class="text-muted d-block text-uppercase">Trekkers Registered</small>
+                            <span class="fs-3">{{ stats.total_users }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card shadow-sm p-3 bg-white border-0 border-start border-warning border-4 fw-bold text-forest">
+                            <small class="text-muted d-block text-uppercase">Total Bookings</small>
+                            <span class="fs-3">{{ stats.total_bookings }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Admin Management Forms -->
+                <div v-if="role === 'admin'" class="row mb-5">
+                    <div class="col-md-7 mb-4 mb-md-0">
+                        <div class="card shadow-sm p-4 border-0 rounded-3">
+                            <h4 class="fw-bold text-forest mb-3">Create New Trek</h4>
+                            <form @submit.prevent="createTrek">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <input v-model="newTrek.name" class="form-control" placeholder="Trek Name" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input v-model="newTrek.location" class="form-control" placeholder="Location" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <input v-model="newTrek.difficulty" class="form-control" placeholder="Difficulty (Easy/Moderate/Hard)" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="number" v-model.number="newTrek.duration" class="form-control" placeholder="Duration (Days)" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <input type="number" v-model.number="newTrek.total_capacity" class="form-control" placeholder="Capacity" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label mb-0 text-muted"><small>Start Date</small></label>
+                                        <input type="date" v-model="newTrek.start_date" class="form-control" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label mb-0 text-muted"><small>End Date</small></label>
+                                        <input type="date" v-model="newTrek.end_date" class="form-control" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-forest bg-forest text-white w-100 fw-bold">Add Trek</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="card shadow-sm p-4 border-0 rounded-3">
+                            <h4 class="fw-bold text-forest mb-3">Create Trek Staff</h4>
+                            <form @submit.prevent="createStaff">
+                                <input v-model="newStaff.name" class="form-control mb-3" placeholder="Staff Name" required>
+                                <input type="email" class="form-control mb-3" v-model="newStaff.email" placeholder="Staff Email" required>
+                                <input type="password" class="form-control mb-3" v-model="newStaff.password" placeholder="Password" required>
+                                <button type="submit" class="btn btn-forest bg-forest text-white w-100 fw-bold">Add Staff</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ADMIN: User Management -->
+                <div v-if="role === 'admin'" class="card shadow-sm mb-5 border-0 rounded-3">
+                    <div class="card-body">
+                        <h4 class="fw-bold text-forest mb-3">Manage Users & Staff</h4>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-if="users.length === 0">
+                                        <td colspan="5" class="text-center text-muted py-4">No users found.</td>
+                                    </tr>
+                                    <tr v-for="u in users" :key="u.id">
+                                        <td class="fw-bold">{{ u.name }}</td>
+                                        <td>{{ u.email }}</td>
+                                        <td><span class="badge bg-secondary">{{ u.role.toUpperCase() }}</span></td>
+                                        <td>
+                                            <span v-if="u.is_active" class="badge bg-success">Active</span>
+                                            <span v-else class="badge bg-danger">Blacklisted</span>
+                                        </td>
+                                        <td>
+                                            <button @click="toggleUser(u.id)" class="btn btn-sm" :class="u.is_active ? 'btn-outline-danger' : 'btn-outline-success'">
+                                                {{ u.is_active ? 'Blacklist' : 'Activate' }}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Trekker Actions -->
+                <div v-if="role === 'trekker'" class="mb-4">
+                    <button @click="exportHistory" class="btn btn-outline-secondary">⬇ Export Booking History (CSV)</button>
+                </div>
+
+                <!-- Search Bar -->
+                <div class="mb-4">
+                    <input type="text" v-model="searchQuery" class="form-control shadow-sm border-0" placeholder="🔍 Search treks by name, location, or difficulty...">
+                </div>
+
+                <!-- Treks List -->
+                <h3 class="fw-bold text-forest mb-4">{{ role === 'staff' ? 'My Assigned Treks' : 'Available Treks' }}</h3>
+                
+                <div class="row">
+                    <template v-for="t in filteredTreks" :key="t.id">
+                        <div class="col-md-4 mb-4" v-if="role !== 'staff' || t.staff_id == userId">
+                            <div class="card trek-card h-100 shadow-sm border-0">
+                                <div class="card-body d-flex flex-column">
+                                    <div class="mb-2">
+                                        <span class="badge bg-forest status-badge">{{ t.difficulty }}</span>
+                                        <span class="badge bg-secondary status-badge ms-2" v-if="t.status !== 'Open'">{{ t.status }}</span>
+                                        <span class="badge bg-success status-badge ms-2" v-else>Open</span>
+                                    </div>
+                                    
+                                    <h5 class="card-title fw-bold">{{ t.name }}</h5>
+                                    <h6 class="card-subtitle mb-3 text-muted">📍 {{ t.location }}</h6>
+                                    
+                                    <p class="card-text mb-1"><small><strong>Slots:</strong> {{ t.available_slots }} / {{ t.total_capacity }}</small></p>
+                                    <p class="card-text mb-3"><small><strong>Dates:</strong> {{ t.start_date }} to {{ t.end_date }}</small></p>
+
+                                    <!-- Staff Controls -->
+                                    <div v-if="role === 'staff'" class="d-grid gap-2 mt-auto">
+                                        <button @click="updateTrekStatus(t.id, 'Open')" class="btn btn-sm btn-outline-success">Set Open</button>
+                                        <button @click="updateTrekStatus(t.id, 'Completed')" class="btn btn-sm btn-outline-secondary">Set Completed</button>
+                                    </div>
+
+                                    <!-- Trekker Actions -->
+                                    <div v-if="role === 'trekker'" class="d-grid mt-auto">
+                                        <button v-if="t.status === 'Open' && t.available_slots > 0" @click="bookTrek(t.id)" class="btn btn-energetic">Book Now</button>
+                                        <button v-else class="btn btn-secondary" disabled>Unavailable</button>
+                                    </div>
+
+                                    <!-- Admin Assignment Dropdown -->
+                                    <div v-if="role === 'admin'" class="mt-auto pt-3 border-top">
+                                        <div class="input-group input-group-sm">
+                                            <select class="form-select text-truncate" v-model="t.selectedStaff">
+                                                <option disabled value="">Assign staff...</option>
+                                                <option v-for="s in staffList" :value="s.id">{{ s.name }} ({{ s.email }})</option>
+                                            </select>
+                                            <button @click="assignStaff(t.id, t.selectedStaff)" class="btn btn-forest bg-forest text-white">Assign</button>
+                                        </div>
+                                        <div v-if="t.staff_id" class="mt-2 text-muted mb-2"><small>Staff ID Assigned: {{ t.staff_id }}</small></div>
+                                        <button @click="deleteTrek(t.id)" class="btn btn-sm btn-danger w-100 mt-2">Remove Trek</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Trekker Booking History Table -->
+                <div v-if="role === 'trekker'" class="mt-5 mb-5">
+                    <hr>
+                    <h4 class="fw-bold text-forest mb-3">My Booking History</h4>
+                    <div class="card shadow-sm border-0 rounded-3">
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Trek Name</th>
+                                        <th>Booking Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="b in history" :key="b.id">
+                                        <td class="fw-bold">{{ b.trek_name }}</td>
+                                        <td>{{ b.date }}</td>
+                                        <td>
+                                            <span class="badge bg-success" v-if="b.status === 'Booked'">Booked</span>
+                                            <span class="badge bg-secondary" v-else>{{ b.status }}</span>
+                                        </td>
+                                    </tr>
+                                    <tr v-if="history.length === 0">
+                                        <td colspan="3" class="text-center text-muted py-4">No bookings found. Start exploring above!</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </div>
-
-        <div v-else>
-            <button @click="logout" style="float: right;">Logout</button>
-            <h2>Dashboard ({{ role }})</h2>
-            
-            <button v-if="role === 'trekker'" @click="exportHistory">Export My History (CSV)</button>
-
-            <div v-if="role === 'admin'" style="border: 1px solid black; padding: 10px; margin-bottom: 20px;">
-                <h3>Create New Trek</h3>
-                <form @submit.prevent="createTrek">
-                    <input v-model="newTrek.name" placeholder="Trek Name" required>
-                    <input v-model="newTrek.location" placeholder="Location" required>
-                    <input v-model="newTrek.difficulty" placeholder="Difficulty" required>
-                    <input type="number" v-model="newTrek.duration" placeholder="Duration (Days)" required>
-                    <input type="number" v-model="newTrek.total_capacity" placeholder="Capacity" required>
-                    <input type="date" v-model="newTrek.start_date" required>
-                    <input type="date" v-model="newTrek.end_date" required>
-                    <button type="submit">Add Trek</button>
-                </form>
-            </div>
-
-            <h3>Available Treks</h3>
-            <ul>
-                <li v-for="t in treks" :key="t.id" style="margin-bottom: 10px;">
-                    <strong>{{ t.name }}</strong> ({{ t.location }}) | 
-                    Diff: {{ t.difficulty }} | Slots: {{ t.available_slots }}
-                    
-                    <button v-if="role === 'trekker' && t.available_slots > 0" @click="bookTrek(t.id)">
-                        Book Now
-                    </button>
-                    <span v-if="t.available_slots <= 0" style="color: red;">FULL</span>
-                </li>
-            </ul>
-        </div>
-
     </div>
-
     <script src="app.js"></script>
 </body>
 </html>

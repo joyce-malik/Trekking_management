@@ -84,7 +84,7 @@ def create_trek():
         
         db.session.add(new_trek)
         db.session.commit()
-        cache.delete('all_treks')
+        cache.delete('all_treks_v2')
         return jsonify({"msg": "Trek created successfully", "id": new_trek.id}), 201
         
     except Exception as e:
@@ -93,30 +93,29 @@ def create_trek():
 
 @app.route('/api/treks', methods=['GET'])
 def get_treks():
-    # 1. Check Redis Cache First
-    cached_treks = cache.get('all_treks')
+    # Let's change the cache key slightly to force a fresh fetch
+    cached_treks = cache.get('all_treks_v2')
     if cached_treks:
         return jsonify(json.loads(cached_treks)), 200
     
-    # 2. If not in cache, query the database
     treks = Trek.query.all()
     results = []
     for t in treks:
         results.append({
-            "id": t.id,
-            "name": t.name,
-            "location": t.location,
+            "id": t.id, 
+            "name": t.name, 
+            "location": t.location, 
             "difficulty": t.difficulty,
-            "duration": t.duration,
-            "available_slots": t.available_slots,
+            "duration": t.duration, 
+            "available_slots": t.available_slots, 
+            "total_capacity": t.total_capacity, # ADDED THIS
+            "staff_id": t.staff_id,             # ADDED THIS
             "status": t.status,
-            "start_date": t.start_date.strftime('%Y-%m-%d'),
-            "end_date": t.end_date.strftime('%Y-%m-%d'),
-            "staff_id": t.staff_id
+            "start_date": t.start_date.strftime('%Y-%m-%d'), 
+            "end_date": t.end_date.strftime('%Y-%m-%d')
         })
         
-    # 3. Save to Redis with a 60-second expiration (satisfies rubric requirement)
-    cache.setex('all_treks', 60, json.dumps(results))
+    cache.setex('all_treks_v2', 60, json.dumps(results))
     
     return jsonify(results), 200
 
@@ -214,7 +213,7 @@ def book_trek(trek_id):
     new_booking = Booking(user_id=user_id, trek_id=trek_id)
     db.session.add(new_booking)
     db.session.commit()
-    cache.delete('all_treks')
+    cache.delete('all_treks_v2')
     
     return jsonify({"msg": "Successfully booked!"}), 200
 
@@ -242,7 +241,7 @@ def assign_staff(trek_id):
         
     trek.staff_id = data.get('staff_id')
     db.session.commit()
-    cache.delete('all_treks')
+    cache.delete('all_treks_v2')
     return jsonify({"msg": "Staff assigned successfully!"}), 200
 
 # --- ADMIN ROUTE: View All Users & Staff ---
@@ -289,7 +288,7 @@ def delete_trek(trek_id):
     db.session.commit()
     
     # Flush cache so deleted trek disappears instantly
-    cache.delete('all_treks')
+    cache.delete('all_treks_v2')
     return jsonify({"msg": "Trek removed successfully."}), 200
 
 # --- STAFF ROUTE: Update Trek Status ---
@@ -311,7 +310,7 @@ def update_status(trek_id):
         trek.status = data['status'] # e.g., 'Open', 'Closed', 'Completed'
     
     db.session.commit()
-    cache.delete('all_treks')
+    cache.delete('all_treks_v2')
     return jsonify({"msg": "Trek status updated to " + trek.status}), 200
 
 # --- USER ROUTE: Booking History ---

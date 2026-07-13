@@ -1,17 +1,18 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-from flask_jwt_extended import JWTManager, create_access_token
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from models import db, User, Trek, Booking
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt
 from datetime import datetime, timedelta
-from flask_jwt_extended import get_jwt_identity
 from celery import Celery
 from celery.schedules import crontab
 import csv
 import os
 import json
 import redis
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 
 
 
@@ -197,24 +198,21 @@ def create_staff():
 @jwt_required()
 def book_trek(trek_id):
     user_id = int(get_jwt_identity())
+    trek = Trek.query.get(trek_id)
     
-    # Check for duplicate booking
+    # Spec requirement: Only allow booking when status is "Open"
+    if not trek or trek.status != 'Open' or trek.available_slots <= 0:
+        return jsonify({"msg": "Trek is not Open or is full"}), 400
+        
     existing = Booking.query.filter_by(user_id=user_id, trek_id=trek_id).first()
     if existing:
         return jsonify({"msg": "You already booked this"}), 400
         
-    updated = Trek.query.filter(Trek.id == trek_id, Trek.available_slots > 0)\
-        .update({Trek.available_slots: Trek.available_slots - 1})
-    db.session.commit()
-    
-    if not updated:
-        return jsonify({"msg": "Trek full or not found"}), 400
-        
+    trek.available_slots -= 1
     new_booking = Booking(user_id=user_id, trek_id=trek_id)
     db.session.add(new_booking)
     db.session.commit()
     cache.delete('all_treks_v2')
-    
     return jsonify({"msg": "Successfully booked!"}), 200
 
 # --- ADMIN ROUTE: Get Staff List ---
@@ -291,27 +289,66 @@ def delete_trek(trek_id):
     cache.delete('all_treks_v2')
     return jsonify({"msg": "Trek removed successfully."}), 200
 
-# --- STAFF ROUTE: Update Trek Status ---
-@app.route('/api/treks/<int:trek_id>/status', methods=['PUT'])
+# --- STAFF ROUTE: Manage Trek Slots & Status ---
+@app.route('/api/treks/<int:trek_id>/manage', methods=['PUT'])
 @jwt_required()
-def update_status(trek_id):
+def manage_trek_staff(trek_id):
     if get_jwt().get("role") != "staff":
         return jsonify({"msg": "Unauthorized"}), 403
-        
-    user_id = int(get_jwt_identity())
-    trek = Trek.query.get(trek_id)
     
-    # Ensure this staff member actually owns this trek
-    if not trek or trek.staff_id != user_id:
-        return jsonify({"msg": "Unauthorized to edit this trek"}), 403
+    trek = Trek.query.get(trek_id)
+    if not trek or trek.staff_id != int(get_jwt_identity()):
+        return jsonify({"msg": "Unauthorized to manage this trek"}), 403
         
     data = request.get_json()
     if 'status' in data:
-        trek.status = data['status'] # e.g., 'Open', 'Closed', 'Completed'
-    
+        trek.status = data['status']
+    if 'available_slots' in data:
+        trek.available_slots = int(data['available_slots'])
+        
     db.session.commit()
     cache.delete('all_treks_v2')
-    return jsonify({"msg": "Trek status updated to " + trek.status}), 200
+    return jsonify({"msg": "Trek updated successfully"}), 200
+
+# --- STAFF/ADMIN ROUTE: View Registered Participants ---
+@app.route('/api/treks/<int:trek_id>/participants', methods=['GET'])
+@jwt_required()
+def get_participants(trek_id):
+    role = get_jwt().get("role")
+    trek = Trek.query.get(trek_id)
+    if not trek or (role == 'staff' and trek.staff_id != int(get_jwt_identity())):
+        return jsonify({"msg": "Unauthorized"}), 403
+        
+    participants = [{"name": b.trekker.name, "email": b.trekker.email, "phone": b.trekker.phone, "date": b.booking_date.strftime('%Y-%m-%d')} for b in trek.bookings]
+    return jsonify(participants), 200
+
+# --- USER ROUTE: Profile Editing ---
+@app.route('/api/profile', methods=['GET', 'PUT'])
+@jwt_required()
+def handle_profile():
+    user = User.query.get(int(get_jwt_identity()))
+    if not user:
+        return jsonify({"msg": "User not found"}), 404
+        
+    if request.method == 'GET':
+        return jsonify({"name": user.name, "phone": user.phone, "city": user.city}), 200
+        
+    data = request.get_json()
+    user.name = data.get('name', user.name)
+    user.phone = data.get('phone', user.phone)
+    user.city = data.get('city', user.city)
+    db.session.commit()
+    return jsonify({"msg": "Profile updated successfully!"}), 200
+
+# --- ADMIN ROUTE: View All Bookings ---
+@app.route('/api/all_bookings', methods=['GET'])
+@jwt_required()
+def get_all_bookings():
+    if get_jwt().get("role") != "admin":
+        return jsonify({"msg": "Unauthorized"}), 403
+    bookings = Booking.query.all()
+    res = [{"id": b.id, "user_name": b.trekker.name, "trek_name": b.trek.name, "date": b.booking_date.strftime('%Y-%m-%d'), "status": b.status} for b in bookings]
+    return jsonify(res), 200
 
 # --- USER ROUTE: Booking History ---
 @app.route('/api/history', methods=['GET'])
@@ -369,6 +406,20 @@ celery.conf.beat_schedule = {
     }
 }
 
+# --- EMAIL DELIVERY SCRIPT VIA MAILHOG ---
+def send_email(to_email, subject, html_body):
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = subject
+    msg['From'] = "admin@tma.com"
+    msg['To'] = to_email
+    msg.attach(MIMEText(html_body, 'html'))
+    try:
+        # Default local SMTP / MailHog port is 1025
+        with smtplib.SMTP('localhost', 1025) as server:
+            server.sendmail("admin@tma.com", to_email, msg.as_string())
+    except Exception as e:
+        print(f"[MAIL DELIVERY ERROR] MailHog failed to send email: {e}")
+
 # --- SCHEDULED TASKS LOGIC ---
 
 @celery.task(name='app.send_daily_reminders')
@@ -381,7 +432,17 @@ def send_daily_reminders():
     
     for trek in treks:
         for booking in trek.bookings:
-            print(f"[MAIL SIMULATION] To: {booking.trekker.email} - REMINDER: Your trek '{trek.name}' starts tomorrow at {trek.location}!")
+            body = f"""
+            <html>
+                <body>
+                    <p>Dear {booking.trekker.name},</p>
+                    <p>This is a reminder that your trek <strong>{trek.name}</strong> at {trek.location} is starting tomorrow!</p>
+                    <p>Safe travels,<br>TMA Team</p>
+                </body>
+            </html>
+            """
+            send_email(booking.trekker.email, f"Trek Reminder: {trek.name} Starts Tomorrow!", body)
+            print(f"[MAIL SENT] Sent reminder to {booking.trekker.email} for trek {trek.name}")
             
     return "Daily reminders processed."
 
@@ -408,7 +469,8 @@ def send_monthly_report():
     </html>
     """
     
-    print(f"[MAIL SIMULATION] To: {admin.email} - Subject: Your Monthly TMA Report\n{html_content}")
+    send_email(admin.email, "TMA Monthly Activity Report", html_content)
+    print(f"[MAIL SENT] Sent monthly activity report to admin at {admin.email}")
     return "Monthly report processed."
 
 
@@ -425,9 +487,10 @@ def export_bookings_csv(user_id):
     
     with open(filename, 'w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(['Booking ID', 'Trek ID', 'Date', 'Status'])
+        # Spec format: User ID, Trek Name, Location, Booking Status, Booking Date
+        writer.writerow(['User ID', 'Trek Name', 'Location', 'Booking Status', 'Booking Date'])
         for b in bookings:
-            writer.writerow([b.id, b.trek_id, b.booking_date.strftime('%Y-%m-%d'), b.status])
+            writer.writerow([b.user_id, b.trek.name, b.trek.location, b.status, b.booking_date.strftime('%Y-%m-%d')])
             
     return filename
 
@@ -438,6 +501,22 @@ def trigger_export():
     # .delay() pushes it to the Redis queue instead of locking up the server
     task = export_bookings_csv.delay(user_id)
     return jsonify({"msg": "Export started", "task_id": task.id}), 202
+
+@app.route('/api/export/status/<task_id>', methods=['GET'])
+@jwt_required()
+def get_export_status(task_id):
+    task = export_bookings_csv.AsyncResult(task_id)
+    if task.state == 'SUCCESS':
+        return jsonify({"status": "SUCCESS", "file": task.result}), 200
+    return jsonify({"status": task.state}), 200
+
+@app.route('/api/download/<path:filename>', methods=['GET'])
+@jwt_required()
+def download_file(filename):
+    # Ensure the user only downloads files from exports to prevent directory traversal
+    if not filename.startswith('exports/'):
+        return jsonify({"msg": "Unauthorized file access"}), 403
+    return send_file(filename, as_attachment=True)
 
 if __name__ == '__main__':
     setup_database()

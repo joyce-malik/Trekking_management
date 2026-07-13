@@ -16,17 +16,54 @@ createApp({
             newTrek: { name: '', location: '', difficulty: '', duration: '', total_capacity: '', start_date: '', end_date: '' },
             newStaff: { name: '', email: '', password: '' },
             users: [],
-            searchQuery: ''
+            searchQuery: '',
+            profile: { name: '', phone: '', city: '' },
+            participants: [],
+            allBookings: [],
+            filterDifficulty: '',
+            filterDuration: '',
+            searchUserQuery: '',
+            exportStatus: null,
+            exportFileUrl: null
         }
     },
     computed: {
         filteredTreks() {
-            if (!this.searchQuery) return this.treks;
-            const query = this.searchQuery.toLowerCase();
-            return this.treks.filter(t => 
-                t.name.toLowerCase().includes(query) || 
-                t.location.toLowerCase().includes(query) ||
-                t.difficulty.toLowerCase().includes(query)
+            let result = this.treks;
+            
+            // Trekkers should only see Open and Approved treks
+            if (this.role === 'trekker') {
+                result = result.filter(t => t.status === 'Open' || t.status === 'Approved');
+            }
+            
+            // Search filter
+            if (this.searchQuery) {
+                const query = this.searchQuery.toLowerCase();
+                result = result.filter(t => 
+                    t.name.toLowerCase().includes(query) || 
+                    t.location.toLowerCase().includes(query) ||
+                    t.difficulty.toLowerCase().includes(query)
+                );
+            }
+            
+            // Dropdown difficulty filter
+            if (this.filterDifficulty) {
+                result = result.filter(t => t.difficulty === this.filterDifficulty);
+            }
+            
+            // Duration filter
+            if (this.filterDuration) {
+                result = result.filter(t => t.duration <= this.filterDuration);
+            }
+            
+            return result;
+        },
+        filteredUsers() {
+            if (!this.searchUserQuery) return this.users;
+            const query = this.searchUserQuery.toLowerCase();
+            return this.users.filter(u => 
+                u.name.toLowerCase().includes(query) || 
+                u.email.toLowerCase().includes(query)
             );
         }
     },
@@ -37,9 +74,14 @@ createApp({
                 this.fetchStaffList();
                 this.fetchStats();
                 this.fetchAllUsers();
+                this.fetchAllBookings();
             }
             if (this.role === 'trekker') {
                 this.fetchHistory();
+                this.fetchProfile();
+            }
+            if (this.role === 'staff') {
+                this.fetchProfile();
             }
         }
     },
@@ -56,16 +98,25 @@ createApp({
                 localStorage.setItem('role', this.role);
                 localStorage.setItem('user_id', this.userId);
                 this.errorMessage = '';
+                this.successMessage = 'Logged in successfully!';
                 this.fetchTreks();
                 if (this.role === 'admin') {
                     this.fetchStaffList();
                     this.fetchStats();
                     this.fetchAllUsers();
+                    this.fetchAllBookings();
                 }
                 if (this.role === 'trekker') {
                     this.fetchHistory();
+                    this.fetchProfile();
                 }
-            } else this.errorMessage = data.msg;
+                if (this.role === 'staff') {
+                    this.fetchProfile();
+                }
+            } else {
+                this.errorMessage = data.msg;
+                this.successMessage = '';
+            }
         },
         async register() {
             const res = await fetch('http://127.0.0.1:5000/api/register', {
@@ -119,7 +170,13 @@ createApp({
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             const data = await res.json();
-            alert(data.msg);
+            if (res.ok) {
+                this.successMessage = data.msg;
+                this.errorMessage = '';
+            } else {
+                this.errorMessage = data.msg;
+                this.successMessage = '';
+            }
             this.fetchAllUsers();
             this.fetchStats();
         },
@@ -130,7 +187,13 @@ createApp({
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             const data = await res.json();
-            alert(data.msg);
+            if (res.ok) {
+                this.successMessage = data.msg;
+                this.errorMessage = '';
+            } else {
+                this.errorMessage = data.msg;
+                this.successMessage = '';
+            }
             this.fetchTreks();
             this.fetchStats();
         },
@@ -140,12 +203,16 @@ createApp({
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
                 body: JSON.stringify(this.newTrek)
             });
-            if(res.ok) {
-                alert("Trek created!");
+            const data = await res.json();
+            if (res.ok) {
+                this.successMessage = "Trek created successfully!";
+                this.errorMessage = '';
+                this.newTrek = { name: '', location: '', difficulty: '', duration: '', total_capacity: '', start_date: '', end_date: '' };
                 this.fetchTreks();
                 this.fetchStats();
             } else {
-                alert("Failed to create trek.");
+                this.errorMessage = data.msg || "Failed to create trek.";
+                this.successMessage = '';
             }
         },
         async createStaff() {
@@ -155,11 +222,17 @@ createApp({
                 body: JSON.stringify(this.newStaff)
             });
             const data = await res.json();
-            alert(data.msg);
-            this.newStaff = { name: '', email: '', password: '' }; 
-            this.fetchStaffList();
-            this.fetchStats();
-            this.fetchAllUsers();
+            if (res.ok) {
+                this.successMessage = data.msg;
+                this.errorMessage = '';
+                this.newStaff = { name: '', email: '', password: '' }; 
+                this.fetchStaffList();
+                this.fetchStats();
+                this.fetchAllUsers();
+            } else {
+                this.errorMessage = data.msg;
+                this.successMessage = '';
+            }
         },
         async assignStaff(trekId, staffId) {
             const res = await fetch(`http://127.0.0.1:5000/api/treks/${trekId}/assign`, {
@@ -168,17 +241,30 @@ createApp({
                 body: JSON.stringify({ staff_id: staffId })
             });
             const data = await res.json();
-            alert(data.msg);
+            if (res.ok) {
+                this.successMessage = data.msg;
+                this.errorMessage = '';
+            } else {
+                this.errorMessage = data.msg;
+                this.successMessage = '';
+            }
             this.fetchTreks();
         },
         async updateTrekStatus(trekId, newStatus) {
-            const res = await fetch(`http://127.0.0.1:5000/api/treks/${trekId}/status`, {
+            // Deprecated status update, using manageTrekSlots now, but keeping for compatibility
+            const res = await fetch(`http://127.0.0.1:5000/api/treks/${trekId}/manage`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
                 body: JSON.stringify({ status: newStatus })
             });
             const data = await res.json();
-            alert(data.msg);
+            if (res.ok) {
+                this.successMessage = data.msg;
+                this.errorMessage = '';
+            } else {
+                this.errorMessage = data.msg;
+                this.successMessage = '';
+            }
             this.fetchTreks();
         },
         async bookTrek(trekId) {
@@ -187,17 +273,106 @@ createApp({
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             const data = await res.json();
-            alert(data.msg);
-            this.fetchTreks(); 
-            this.fetchHistory();
-            this.fetchStats();
+            if (res.ok) {
+                this.successMessage = data.msg;
+                this.errorMessage = '';
+                this.fetchTreks(); 
+                this.fetchHistory();
+                this.fetchStats();
+            } else {
+                this.errorMessage = data.msg;
+                this.successMessage = '';
+            }
         },
         async exportHistory() {
+            this.exportStatus = 'Initiating export...';
+            this.exportFileUrl = null;
             const res = await fetch('http://127.0.0.1:5000/api/export', {
                 method: 'POST', headers: { 'Authorization': `Bearer ${this.token}` }
             });
             const data = await res.json();
-            alert(data.msg + ". Task ID: " + data.task_id);
+            if (res.ok) {
+                this.pollExport(data.task_id);
+            } else {
+                this.errorMessage = data.msg;
+                this.exportStatus = 'Failed';
+            }
+        },
+        async pollExport(taskId) {
+            this.exportStatus = 'Processing...';
+            const interval = setInterval(async () => {
+                const res = await fetch(`http://127.0.0.1:5000/api/export/status/${taskId}`, {
+                    headers: { 'Authorization': `Bearer ${this.token}` }
+                });
+                const data = await res.json();
+                if (data.status === 'SUCCESS') {
+                    clearInterval(interval);
+                    this.exportStatus = 'Complete!';
+                    this.exportFileUrl = `http://127.0.0.1:5000/api/download/${data.file}`;
+                } else if (data.status === 'FAILURE' || data.status === 'REVOKED') {
+                    clearInterval(interval);
+                    this.exportStatus = 'Export failed or cancelled.';
+                }
+            }, 2000);
+        },
+        async fetchProfile() {
+            const res = await fetch('http://127.0.0.1:5000/api/profile', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (res.ok) {
+                this.profile = await res.json();
+            }
+        },
+        async updateProfile() {
+            const res = await fetch('http://127.0.0.1:5000/api/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                body: JSON.stringify(this.profile)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.successMessage = "Profile updated successfully!";
+                this.errorMessage = '';
+            } else {
+                this.errorMessage = data.msg;
+                this.successMessage = '';
+            }
+        },
+        async manageTrekSlots(trek) {
+            const res = await fetch(`http://127.0.0.1:5000/api/treks/${trek.id}/manage`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${this.token}` },
+                body: JSON.stringify({ available_slots: trek.available_slots, status: trek.status })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.successMessage = "Trek slots/status updated successfully!";
+                this.errorMessage = '';
+                this.fetchTreks();
+            } else {
+                this.errorMessage = data.msg;
+                this.successMessage = '';
+            }
+        },
+        async fetchParticipants(trekId) {
+            const res = await fetch(`http://127.0.0.1:5000/api/treks/${trekId}/participants`, {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (res.ok) {
+                this.participants = await res.json();
+                // Scroll to participants list for better UX
+                setTimeout(() => {
+                    document.getElementById('participants-section')?.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            }
+        },
+        async fetchAllBookings() {
+            const res = await fetch('http://127.0.0.1:5000/api/all_bookings', {
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            if (res.ok) {
+                this.allBookings = await res.json();
+            }
         }
     }
 }).mount('#app');

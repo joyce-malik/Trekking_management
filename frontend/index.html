@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" class="form-control" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TMA - Adventure Awaits</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="style.css" rel="stylesheet">
@@ -57,6 +57,25 @@
             <!-- Main App Content (Dashboard) -->
             <div v-else>
                 
+                <!-- Profile Editor Card -->
+                <div class="card p-4 mb-4 shadow-sm border-0 rounded-3">
+                    <h5 class="fw-bold text-forest mb-3">👤 My Profile</h5>
+                    <form @submit.prevent="updateProfile" class="row g-2 align-items-center">
+                        <div class="col-sm-3">
+                            <input v-model="profile.name" class="form-control form-control-sm" placeholder="Name" required>
+                        </div>
+                        <div class="col-sm-3">
+                            <input v-model="profile.phone" class="form-control form-control-sm" placeholder="Phone">
+                        </div>
+                        <div class="col-sm-3">
+                            <input v-model="profile.city" class="form-control form-control-sm" placeholder="City">
+                        </div>
+                        <div class="col-sm-3">
+                            <button class="btn btn-sm btn-forest text-white w-100 fw-bold" type="submit">Update Profile</button>
+                        </div>
+                    </form>
+                </div>
+
                 <!-- Admin Stats Section -->
                 <div v-if="role === 'admin'" class="row mb-5 text-center">
                     <div class="col-md-4">
@@ -132,7 +151,12 @@
                 <!-- ADMIN: User Management -->
                 <div v-if="role === 'admin'" class="card shadow-sm mb-5 border-0 rounded-3">
                     <div class="card-body">
-                        <h4 class="fw-bold text-forest mb-3">Manage Users & Staff</h4>
+                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+                            <h4 class="fw-bold text-forest mb-2">Manage Users & Staff</h4>
+                            <div class="col-md-4">
+                                <input type="text" v-model="searchUserQuery" class="form-control form-control-sm shadow-sm" placeholder="🔍 Search users by name/email...">
+                            </div>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0">
                                 <thead class="table-light">
@@ -145,10 +169,10 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr v-if="users.length === 0">
+                                    <tr v-if="filteredUsers.length === 0">
                                         <td colspan="5" class="text-center text-muted py-4">No users found.</td>
                                     </tr>
-                                    <tr v-for="u in users" :key="u.id">
+                                    <tr v-for="u in filteredUsers" :key="u.id">
                                         <td class="fw-bold">{{ u.name }}</td>
                                         <td>{{ u.email }}</td>
                                         <td><span class="badge bg-secondary">{{ u.role.toUpperCase() }}</span></td>
@@ -168,14 +192,64 @@
                     </div>
                 </div>
 
-                <!-- Trekker Actions -->
-                <div v-if="role === 'trekker'" class="mb-4">
-                    <button @click="exportHistory" class="btn btn-outline-secondary">⬇ Export Booking History (CSV)</button>
+                <!-- ADMIN: All Bookings List -->
+                <div v-if="role === 'admin'" class="card shadow-sm mb-5 border-0 rounded-3">
+                    <div class="card-body">
+                        <h4 class="fw-bold text-forest mb-3">All Historical Bookings</h4>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Booking ID</th>
+                                        <th>Trekker Name</th>
+                                        <th>Trek Name</th>
+                                        <th>Booking Date</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-if="allBookings.length === 0">
+                                        <td colspan="5" class="text-center text-muted py-4">No bookings found.</td>
+                                    </tr>
+                                    <tr v-for="b in allBookings" :key="b.id">
+                                        <td>#{{ b.id }}</td>
+                                        <td class="fw-bold">{{ b.user_name }}</td>
+                                        <td>{{ b.trek_name }}</td>
+                                        <td>{{ b.date }}</td>
+                                        <td>
+                                            <span class="badge bg-success" v-if="b.status === 'Booked'">Booked</span>
+                                            <span class="badge bg-secondary" v-else>{{ b.status }}</span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Search Bar -->
-                <div class="mb-4">
-                    <input type="text" v-model="searchQuery" class="form-control shadow-sm border-0" placeholder="🔍 Search treks by name, location, or difficulty...">
+                <!-- Trekker Actions -->
+                <div v-if="role === 'trekker'" class="mb-4 d-flex align-items-center flex-wrap gap-2">
+                    <button @click="exportHistory" class="btn btn-outline-secondary">⬇ Export Booking History (CSV)</button>
+                    <span v-if="exportStatus" class="ms-2 badge bg-secondary p-2">{{ exportStatus }}</span>
+                    <a v-if="exportFileUrl" :href="exportFileUrl" class="btn btn-sm btn-success fw-bold ms-2" target="_blank">Download CSV File</a>
+                </div>
+
+                <!-- Search Bar & Filters -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <input type="text" v-model="searchQuery" class="form-control shadow-sm border-0" placeholder="🔍 Search treks by name, location, or difficulty...">
+                    </div>
+                    <div class="col-md-3">
+                        <select v-model="filterDifficulty" class="form-select shadow-sm border-0">
+                            <option value="">All Difficulties</option>
+                            <option value="Easy">Easy</option>
+                            <option value="Moderate">Moderate</option>
+                            <option value="Hard">Hard</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <input type="number" v-model.number="filterDuration" class="form-control shadow-sm border-0" placeholder="Max Duration (Days)">
+                    </div>
                 </div>
 
                 <!-- Treks List -->
@@ -199,9 +273,23 @@
                                     <p class="card-text mb-3"><small><strong>Dates:</strong> {{ t.start_date }} to {{ t.end_date }}</small></p>
 
                                     <!-- Staff Controls -->
-                                    <div v-if="role === 'staff'" class="d-grid gap-2 mt-auto">
-                                        <button @click="updateTrekStatus(t.id, 'Open')" class="btn btn-sm btn-outline-success">Set Open</button>
-                                        <button @click="updateTrekStatus(t.id, 'Completed')" class="btn btn-sm btn-outline-secondary">Set Completed</button>
+                                    <div v-if="role === 'staff'" class="mt-auto">
+                                        <div class="mb-2">
+                                            <label class="form-label mb-1 text-muted"><small>Available Slots:</small></label>
+                                            <input type="number" v-model.number="t.available_slots" class="form-control form-control-sm mb-2" required>
+                                        </div>
+                                        <div class="mb-3">
+                                            <label class="form-label mb-1 text-muted"><small>Status:</small></label>
+                                            <select v-model="t.status" class="form-select form-select-sm">
+                                                <option value="Open">Open</option>
+                                                <option value="Closed">Closed</option>
+                                                <option value="Completed">Completed</option>
+                                            </select>
+                                        </div>
+                                        <div class="d-grid gap-2">
+                                            <button @click="manageTrekSlots(t)" class="btn btn-sm btn-primary fw-bold">Update Trek</button>
+                                            <button @click="fetchParticipants(t.id)" class="btn btn-sm btn-outline-info fw-bold">View Participants</button>
+                                        </div>
                                     </div>
 
                                     <!-- Trekker Actions -->
@@ -226,6 +314,36 @@
                             </div>
                         </div>
                     </template>
+                </div>
+
+                <!-- Participants List for Selected Trek (Staff / Admin) -->
+                <div id="participants-section" v-if="participants.length > 0" class="card shadow-sm mb-5 border-0 rounded-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="fw-bold text-forest mb-0">Registered Participants</h4>
+                            <button @click="participants = []" class="btn btn-sm btn-outline-secondary">Close View</button>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Trekker Name</th>
+                                        <th>Email</th>
+                                        <th>Phone</th>
+                                        <th>Booking Date</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="p in participants">
+                                        <td class="fw-bold">{{ p.name }}</td>
+                                        <td>{{ p.email }}</td>
+                                        <td>{{ p.phone || 'N/A' }}</td>
+                                        <td>{{ p.date }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Trekker Booking History Table -->

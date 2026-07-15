@@ -358,6 +358,7 @@
                                         <th>Trek Name</th>
                                         <th>Booking Date</th>
                                         <th>Status</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -366,11 +367,15 @@
                                         <td>{{ b.date }}</td>
                                         <td>
                                             <span class="badge bg-success" v-if="b.status === 'Booked'">Booked</span>
+                                            <span class="badge bg-danger" v-else-if="b.status === 'Cancelled'">Cancelled</span>
                                             <span class="badge bg-secondary" v-else>{{ b.status }}</span>
+                                        </td>
+                                        <td>
+                                            <button v-if="b.status === 'Booked'" @click="cancelBooking(b.id)" class="btn btn-sm btn-outline-danger">Cancel</button>
                                         </td>
                                     </tr>
                                     <tr v-if="history.length === 0">
-                                        <td colspan="3" class="text-center text-muted py-4">No bookings found. Start exploring above!</td>
+                                        <td colspan="4" class="text-center text-muted py-4">No bookings found. Start exploring above!</td>
                                     </tr>
                                 </tbody>
                             </table>

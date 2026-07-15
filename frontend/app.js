@@ -373,6 +373,21 @@ createApp({
             if (res.ok) {
                 this.allBookings = await res.json();
             }
+        },
+        async cancelBooking(bookingId) {
+            if (!confirm("Are you sure you want to cancel this booking?")) return;
+            const res = await fetch(`http://127.0.0.1:5000/api/bookings/${bookingId}/cancel`, {
+                method: 'PUT',
+                headers: { 'Authorization': `Bearer ${this.token}` }
+            });
+            const data = await res.json();
+            if (res.ok) {
+                this.successMessage = data.msg;
+                this.fetchHistory();
+                this.fetchTreks();
+            } else {
+                this.errorMessage = data.msg;
+            }
         }
     }
 }).mount('#app');

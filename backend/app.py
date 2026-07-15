@@ -350,6 +350,27 @@ def get_all_bookings():
     res = [{"id": b.id, "user_name": b.trekker.name, "trek_name": b.trek.name, "date": b.booking_date.strftime('%Y-%m-%d'), "status": b.status} for b in bookings]
     return jsonify(res), 200
 
+# --- USER ROUTE: Cancel Booking ---
+@app.route('/api/bookings/<int:booking_id>/cancel', methods=['PUT'])
+@jwt_required()
+def cancel_booking(booking_id):
+    user_id = int(get_jwt_identity())
+    booking = Booking.query.get(booking_id)
+    
+    if not booking or booking.user_id != user_id:
+        return jsonify({"msg": "Booking not found or unauthorized"}), 404
+        
+    if booking.status == 'Cancelled':
+        return jsonify({"msg": "Booking is already cancelled"}), 400
+        
+    # Free up the slot and update status
+    booking.status = 'Cancelled'
+    booking.trek.available_slots += 1
+    
+    db.session.commit()
+    cache.delete('all_treks_v2')
+    return jsonify({"msg": "Booking cancelled successfully!"}), 200
+
 # --- USER ROUTE: Booking History ---
 @app.route('/api/history', methods=['GET'])
 @jwt_required()

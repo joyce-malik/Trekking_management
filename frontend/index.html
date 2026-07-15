@@ -7,6 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="style.css" rel="stylesheet">
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body class="bg-light">
     <div id="app">
@@ -27,7 +28,11 @@
             <div v-if="successMessage" class="alert alert-success">{{ successMessage }}</div>
 
             <!-- Login / Registration Block -->
-            <div v-if="!token" class="row justify-content-center">
+            <div v-if="!token" class="row justify-content-center mt-5">
+                <div class="col-md-7 mb-4 text-center">
+                    <h1 class="fw-bold text-forest display-4">Explore the Wilderness</h1>
+                    <p class="lead text-muted">Join {{ publicStats.happy_trekkers }} trekkers on {{ publicStats.active_treks }} active open trails right now.</p>
+                </div>
                 <div class="col-md-5">
                     <div class="card trek-card shadow p-4">
                         <h2 class="fw-bold text-forest mb-4">{{ isRegistering ? 'Join the Trail' : 'Welcome Back' }}</h2>
@@ -100,6 +105,15 @@
                         <div class="card shadow-sm p-3 bg-white border-0 border-start border-warning border-4 fw-bold text-forest">
                             <small class="text-muted d-block text-uppercase">Total Bookings</small>
                             <span class="fs-3">{{ stats.total_bookings }}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="role === 'admin'" class="row mb-5">
+                    <div class="col-12">
+                        <div class="card shadow-sm p-4 border-0">
+                            <h5 class="fw-bold text-forest">System Overview</h5>
+                            <canvas id="adminChart" height="100"></canvas>
                         </div>
                     </div>
                 </div>

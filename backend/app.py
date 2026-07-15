@@ -380,6 +380,13 @@ def get_history():
     results = [{"id": b.id, "trek_name": b.trek.name, "date": b.booking_date.strftime('%Y-%m-%d'), "status": b.status} for b in bookings]
     return jsonify(results), 200
 
+@app.route('/api/public_stats', methods=['GET'])
+def get_public_stats():
+    return jsonify({
+        "active_treks": Trek.query.filter_by(status='Open').count(),
+        "happy_trekkers": User.query.filter_by(role='trekker').count()
+    }), 200
+
 # --- ADMIN ROUTE: Statistics ---
 @app.route('/api/stats', methods=['GET'])
 @jwt_required()

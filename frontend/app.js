@@ -24,7 +24,8 @@ createApp({
             filterDuration: '',
             searchUserQuery: '',
             exportStatus: null,
-            exportFileUrl: null
+            exportFileUrl: null,
+            publicStats: { active_treks: 0, happy_trekkers: 0 }
         }
     },
     computed: {
@@ -68,6 +69,9 @@ createApp({
         }
     },
     mounted() {
+        fetch('http://127.0.0.1:5000/api/public_stats')
+            .then(res => res.json())
+            .then(data => this.publicStats = data);
         if (this.token) {
             this.fetchTreks();
             if (this.role === 'admin') {
@@ -157,6 +161,27 @@ createApp({
                 headers: { 'Authorization': `Bearer ${this.token}` }
             });
             this.stats = await res.json();
+            
+            // Draw Chart
+            if (this.role === 'admin') {
+                setTimeout(() => {
+                    const ctx = document.getElementById('adminChart');
+                    if (ctx) {
+                        if (window.myChart) window.myChart.destroy();
+                        window.myChart = new Chart(ctx, {
+                            type: 'bar',
+                            data: {
+                                labels: ['Treks', 'Trekkers', 'Staff', 'Bookings'],
+                                datasets: [{
+                                    label: 'System Totals',
+                                    data: [this.stats.total_treks, this.stats.total_users, this.stats.total_staff, this.stats.total_bookings],
+                                    backgroundColor: ['#2b5329', '#ff6b35', '#17a2b8', '#ffc107']
+                                }]
+                            }
+                        });
+                    }
+                }, 100);
+            }
         },
         async fetchAllUsers() {
             const res = await fetch('http://127.0.0.1:5000/api/users', {

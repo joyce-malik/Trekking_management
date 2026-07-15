@@ -14,7 +14,7 @@
         <!-- Navigation bar -->
         <nav class="navbar navbar-expand-lg navbar-dark bg-forest shadow-sm">
             <div class="container">
-                <span class="navbar-brand fw-bold">⛰️ TMA Explorer</span>
+                <span class="navbar-brand fw-bold">⛰️ Parvat Ahh!</span>
                 <div class="d-flex" v-if="token">
                     <span class="navbar-text text-white me-3">Role: <strong>{{ role.toUpperCase() }}</strong></span>
                     <button @click="logout" class="btn btn-sm btn-outline-light">Logout</button>
@@ -28,14 +28,14 @@
             <div v-if="successMessage" class="alert alert-success">{{ successMessage }}</div>
 
             <!-- Login / Registration Block -->
-            <div v-if="!token" class="row justify-content-center mt-5">
-                <div class="col-md-7 mb-4 text-center">
-                    <h1 class="fw-bold text-forest display-4">Explore the Wilderness</h1>
+            <div v-if="!token" class="row justify-content-center align-items-center mt-5 pt-md-4">
+                <div class="col-12 text-center mb-4">
+                    <h1 class="fw-bold text-forest display-4">Explore the Trekkers High</h1>
                     <p class="lead text-muted">Join {{ publicStats.happy_trekkers }} trekkers on {{ publicStats.active_treks }} active open trails right now.</p>
                 </div>
-                <div class="col-md-5">
-                    <div class="card trek-card shadow p-4">
-                        <h2 class="fw-bold text-forest mb-4">{{ isRegistering ? 'Join the Trail' : 'Welcome Back' }}</h2>
+                <div class="col-12 col-md-6 col-lg-5">
+                    <div class="card trek-card shadow p-4 mx-auto">
+                        <h2 class="fw-bold text-forest mb-4 text-center">{{ isRegistering ? 'Join the Trail' : 'Welcome Back' }}</h2>
                         
                         <form v-if="!isRegistering" @submit.prevent="login">
                             <input type="email" class="form-control mb-3" v-model="email" placeholder="Email" required>
@@ -60,68 +60,135 @@
             </div>
 
             <!-- Main App Content (Dashboard) -->
-            <div v-else>
-                
-                <!-- Profile Editor Card -->
-                <div class="card p-4 mb-4 shadow-sm border-0 rounded-3">
-                    <h5 class="fw-bold text-forest mb-3">👤 My Profile</h5>
-                    <form @submit.prevent="updateProfile" class="row g-2 align-items-center">
-                        <div class="col-sm-3">
-                            <input v-model="profile.name" class="form-control form-control-sm" placeholder="Name" required>
+            <!-- Main App Content (Dashboard) -->
+            <div v-else class="row mt-4">
+                <!-- Sidebar (Left Column) -->
+                <div class="col-md-3 mb-4">
+                    <div class="card shadow-sm border-0 p-3 bg-white rounded-3">
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="fs-4 me-2">⛰️</span>
+                            <h5 class="fw-bold mb-0 text-forest">TMA Menu</h5>
                         </div>
-                        <div class="col-sm-3">
-                            <input v-model="profile.phone" class="form-control form-control-sm" placeholder="Phone">
+                        <div class="list-group list-group-flush">
+                            <!-- Admin Navigation -->
+                            <template v-if="role === 'admin'">
+                                <button @click="setView('dashboard')" 
+                                        :class="['list-group-item list-group-item-action border-0 rounded mb-1 text-start d-flex align-items-center gap-2', currentView === 'dashboard' ? 'bg-forest text-white fw-bold shadow-sm' : 'text-dark']">
+                                    <span>🏠</span> Dashboard
+                                </button>
+                                <button @click="setView('treks')" 
+                                        :class="['list-group-item list-group-item-action border-0 rounded mb-1 text-start d-flex align-items-center gap-2', currentView === 'treks' ? 'bg-forest text-white fw-bold shadow-sm' : 'text-dark']">
+                                    <span>⛰️</span> Manage Treks
+                                </button>
+                                <button @click="setView('users')" 
+                                        :class="['list-group-item list-group-item-action border-0 rounded mb-1 text-start d-flex align-items-center gap-2', currentView === 'users' ? 'bg-forest text-white fw-bold shadow-sm' : 'text-dark']">
+                                    <span>👥</span> Users & Staff
+                                </button>
+                                <button @click="setView('bookings')" 
+                                        :class="['list-group-item list-group-item-action border-0 rounded mb-1 text-start d-flex align-items-center gap-2', currentView === 'bookings' ? 'bg-forest text-white fw-bold shadow-sm' : 'text-dark']">
+                                    <span>📋</span> Historical Bookings
+                                </button>
+                            </template>
+
+                            <!-- Staff Navigation -->
+                            <template v-if="role === 'staff'">
+                                <button @click="setView('treks')" 
+                                        :class="['list-group-item list-group-item-action border-0 rounded mb-1 text-start d-flex align-items-center gap-2', currentView === 'treks' ? 'bg-forest text-white fw-bold shadow-sm' : 'text-dark']">
+                                    <span>⛰️</span> Assigned Treks
+                                </button>
+                                <button @click="setView('profile')" 
+                                        :class="['list-group-item list-group-item-action border-0 rounded mb-1 text-start d-flex align-items-center gap-2', currentView === 'profile' ? 'bg-forest text-white fw-bold shadow-sm' : 'text-dark']">
+                                    <span>👤</span> My Profile
+                                </button>
+                            </template>
+
+                            <!-- Trekker Navigation -->
+                            <template v-if="role === 'trekker'">
+                                <button @click="setView('explore')" 
+                                        :class="['list-group-item list-group-item-action border-0 rounded mb-1 text-start d-flex align-items-center gap-2', currentView === 'explore' ? 'bg-forest text-white fw-bold shadow-sm' : 'text-dark']">
+                                    <span>🧭</span> Explore Treks
+                                </button>
+                                <button @click="setView('bookings')" 
+                                        :class="['list-group-item list-group-item-action border-0 rounded mb-1 text-start d-flex align-items-center gap-2', currentView === 'bookings' ? 'bg-forest text-white fw-bold shadow-sm' : 'text-dark']">
+                                    <span>📋</span> My Bookings
+                                </button>
+                                <button @click="setView('profile')" 
+                                        :class="['list-group-item list-group-item-action border-0 rounded mb-1 text-start d-flex align-items-center gap-2', currentView === 'profile' ? 'bg-forest text-white fw-bold shadow-sm' : 'text-dark']">
+                                    <span>👤</span> My Profile
+                                </button>
+                            </template>
                         </div>
-                        <div class="col-sm-3">
-                            <input v-model="profile.city" class="form-control form-control-sm" placeholder="City">
-                        </div>
-                        <div class="col-sm-3">
-                            <button class="btn btn-sm btn-forest text-white w-100 fw-bold" type="submit">Update Profile</button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
 
-                <!-- Admin Stats Section -->
-                <div v-if="role === 'admin'" class="row mb-5 text-center">
-                    <div class="col-md-3">
-                        <div class="card shadow-sm p-3 bg-white border-0 border-start border-primary border-4 fw-bold text-forest">
-                            <small class="text-muted d-block text-uppercase">Total Treks</small>
-                            <span class="fs-3">{{ stats.total_treks }}</span>
-                        </div>
+                <!-- Main Content (Right Column) -->
+                <div class="col-md-9">
+                    <!-- Profile View -->
+                    <div v-if="currentView === 'profile'" class="card p-4 shadow-sm border-0 rounded-3 mb-4">
+                        <h5 class="fw-bold text-forest mb-3">👤 My Profile</h5>
+                        <form @submit.prevent="updateProfile" class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label text-muted"><small>Full Name</small></label>
+                                <input v-model="profile.name" class="form-control" placeholder="Name" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted"><small>Phone Number</small></label>
+                                <input v-model="profile.phone" class="form-control" placeholder="Phone">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label text-muted"><small>City</small></label>
+                                <input v-model="profile.city" class="form-control" placeholder="City">
+                            </div>
+                            <div class="col-12 mt-3">
+                                <button class="btn btn-forest bg-forest text-white fw-bold px-4" type="submit">Update Profile</button>
+                            </div>
+                        </form>
                     </div>
-                    <div class="col-md-3">
-                        <div class="card shadow-sm p-3 bg-white border-0 border-start border-success border-4 fw-bold text-forest">
-                            <small class="text-muted d-block text-uppercase">Trekkers Registered</small>
-                            <span class="fs-3">{{ stats.total_users }}</span>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card shadow-sm p-3 bg-white border-0 border-start border-info border-4 fw-bold text-forest">
-                            <small class="text-muted d-block text-uppercase">Trekking Staff</small>
-                            <span class="fs-3">{{ stats.total_staff }}</span>
-                        </div>
-                    </div>
-                    <div class="col-md-3">
-                        <div class="card shadow-sm p-3 bg-white border-0 border-start border-warning border-4 fw-bold text-forest">
-                            <small class="text-muted d-block text-uppercase">Total Bookings</small>
-                            <span class="fs-3">{{ stats.total_bookings }}</span>
-                        </div>
-                    </div>
-                </div>
 
-                <div v-if="role === 'admin'" class="row mb-5">
-                    <div class="col-12">
-                        <div class="card shadow-sm p-4 border-0">
-                            <h5 class="fw-bold text-forest">System Overview</h5>
-                            <canvas id="adminChart" height="100"></canvas>
+                    <!-- Admin Dashboard View -->
+                    <div v-if="currentView === 'dashboard' && role === 'admin'">
+                        <!-- Admin Stats Section -->
+                        <div class="row mb-4 text-center">
+                            <div class="col-md-3 mb-3 mb-md-0">
+                                <div class="card shadow-sm p-3 bg-white border-0 border-start border-primary border-4 fw-bold text-forest h-100">
+                                    <small class="text-muted d-block text-uppercase">Total Treks</small>
+                                    <span class="fs-3">{{ stats.total_treks }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3 mb-md-0">
+                                <div class="card shadow-sm p-3 bg-white border-0 border-start border-success border-4 fw-bold text-forest h-100">
+                                    <small class="text-muted d-block text-uppercase">Trekkers Registered</small>
+                                    <span class="fs-3">{{ stats.total_users }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3 mb-md-0">
+                                <div class="card shadow-sm p-3 bg-white border-0 border-start border-info border-4 fw-bold text-forest h-100">
+                                    <small class="text-muted d-block text-uppercase">Trekking Staff</small>
+                                    <span class="fs-3">{{ stats.total_staff }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3 mb-3 mb-md-0">
+                                <div class="card shadow-sm p-3 bg-white border-0 border-start border-warning border-4 fw-bold text-forest h-100">
+                                    <small class="text-muted d-block text-uppercase">Total Bookings</small>
+                                    <span class="fs-3">{{ stats.total_bookings }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- System Overview Chart -->
+                        <div class="row mb-4">
+                            <div class="col-12">
+                                <div class="card shadow-sm p-4 border-0">
+                                    <h5 class="fw-bold text-forest mb-3">System Overview</h5>
+                                    <canvas id="adminChart" height="120"></canvas>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- Admin Management Forms -->
-                <div v-if="role === 'admin'" class="row mb-5">
-                    <div class="col-md-7 mb-4 mb-md-0">
-                        <div class="card shadow-sm p-4 border-0 rounded-3">
+                    <!-- Admin Manage Treks View -->
+                    <div v-if="currentView === 'treks' && role === 'admin'">
+                        <div class="card shadow-sm p-4 border-0 rounded-3 mb-4">
                             <h4 class="fw-bold text-forest mb-3">Create New Trek</h4>
                             <form @submit.prevent="createTrek">
                                 <div class="row g-3">
@@ -154,255 +221,313 @@
                                 </div>
                             </form>
                         </div>
-                    </div>
-                    <div class="col-md-5">
-                        <div class="card shadow-sm p-4 border-0 rounded-3">
-                            <h4 class="fw-bold text-forest mb-3">Create Trek Staff</h4>
-                            <form @submit.prevent="createStaff">
-                                <input v-model="newStaff.name" class="form-control mb-3" placeholder="Staff Name" required>
-                                <input type="email" class="form-control mb-3" v-model="newStaff.email" placeholder="Staff Email" required>
-                                <input type="password" class="form-control mb-3" v-model="newStaff.password" placeholder="Password" required>
-                                <button type="submit" class="btn btn-forest bg-forest text-white w-100 fw-bold">Add Staff</button>
-                            </form>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- ADMIN: User Management -->
-                <div v-if="role === 'admin'" class="card shadow-sm mb-5 border-0 rounded-3">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
-                            <h4 class="fw-bold text-forest mb-2">Manage Users & Staff</h4>
-                            <div class="col-md-4">
-                                <input type="text" v-model="searchUserQuery" class="form-control form-control-sm shadow-sm" placeholder="🔍 Search users by name/email...">
-                            </div>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Name</th>
-                                        <th>Email</th>
-                                        <th>Role</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-if="filteredUsers.length === 0">
-                                        <td colspan="5" class="text-center text-muted py-4">No users found.</td>
-                                    </tr>
-                                    <tr v-for="u in filteredUsers" :key="u.id">
-                                        <td class="fw-bold">{{ u.name }}</td>
-                                        <td>{{ u.email }}</td>
-                                        <td><span class="badge bg-secondary">{{ u.role.toUpperCase() }}</span></td>
-                                        <td>
-                                            <span v-if="u.is_active" class="badge bg-success">Active</span>
-                                            <span v-else class="badge bg-danger">Blacklisted</span>
-                                        </td>
-                                        <td>
-                                            <button @click="toggleUser(u.id)" class="btn btn-sm" :class="u.is_active ? 'btn-outline-danger' : 'btn-outline-success'">
-                                                {{ u.is_active ? 'Blacklist' : 'Activate' }}
-                                            </button>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ADMIN: All Bookings List -->
-                <div v-if="role === 'admin'" class="card shadow-sm mb-5 border-0 rounded-3">
-                    <div class="card-body">
-                        <h4 class="fw-bold text-forest mb-3">All Historical Bookings</h4>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Booking ID</th>
-                                        <th>Trekker Name</th>
-                                        <th>Trek Name</th>
-                                        <th>Booking Date</th>
-                                        <th>Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-if="allBookings.length === 0">
-                                        <td colspan="5" class="text-center text-muted py-4">No bookings found.</td>
-                                    </tr>
-                                    <tr v-for="b in allBookings" :key="b.id">
-                                        <td>#{{ b.id }}</td>
-                                        <td class="fw-bold">{{ b.user_name }}</td>
-                                        <td>{{ b.trek_name }}</td>
-                                        <td>{{ b.date }}</td>
-                                        <td>
-                                            <span class="badge bg-success" v-if="b.status === 'Booked'">Booked</span>
-                                            <span class="badge bg-secondary" v-else>{{ b.status }}</span>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Trekker Actions -->
-                <div v-if="role === 'trekker'" class="mb-4 d-flex align-items-center flex-wrap gap-2">
-                    <button @click="exportHistory" class="btn btn-outline-secondary">⬇ Export Booking History (CSV)</button>
-                    <span v-if="exportStatus" class="ms-2 badge bg-secondary p-2">{{ exportStatus }}</span>
-                    <a v-if="exportFileUrl" :href="exportFileUrl" class="btn btn-sm btn-success fw-bold ms-2" target="_blank">Download CSV File</a>
-                </div>
-
-                <!-- Search Bar & Filters -->
-                <div class="row g-3 mb-4">
-                    <div class="col-md-6">
-                        <input type="text" v-model="searchQuery" class="form-control shadow-sm border-0" placeholder="🔍 Search treks by name, location, or difficulty...">
-                    </div>
-                    <div class="col-md-3">
-                        <select v-model="filterDifficulty" class="form-select shadow-sm border-0">
-                            <option value="">All Difficulties</option>
-                            <option value="Easy">Easy</option>
-                            <option value="Moderate">Moderate</option>
-                            <option value="Hard">Hard</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3">
-                        <input type="number" v-model.number="filterDuration" class="form-control shadow-sm border-0" placeholder="Max Duration (Days)">
-                    </div>
-                </div>
-
-                <!-- Treks List -->
-                <h3 class="fw-bold text-forest mb-4">{{ role === 'staff' ? 'My Assigned Treks' : 'Available Treks' }}</h3>
-                
-                <div class="row">
-                    <template v-for="t in filteredTreks" :key="t.id">
-                        <div class="col-md-4 mb-4" v-if="role !== 'staff' || t.staff_id == userId">
-                            <div class="card trek-card h-100 shadow-sm border-0">
-                                <div class="card-body d-flex flex-column">
-                                    <div class="mb-2">
-                                        <span class="badge bg-forest status-badge">{{ t.difficulty }}</span>
-                                        <span class="badge bg-secondary status-badge ms-2" v-if="t.status !== 'Open'">{{ t.status }}</span>
-                                        <span class="badge bg-success status-badge ms-2" v-else>Open</span>
-                                    </div>
-                                    
-                                    <h5 class="card-title fw-bold">{{ t.name }}</h5>
-                                    <h6 class="card-subtitle mb-3 text-muted">📍 {{ t.location }}</h6>
-                                    
-                                    <p class="card-text mb-1"><small><strong>Slots:</strong> {{ t.available_slots }} / {{ t.total_capacity }}</small></p>
-                                    <p class="card-text mb-3"><small><strong>Dates:</strong> {{ t.start_date }} to {{ t.end_date }}</small></p>
-
-                                    <!-- Staff Controls -->
-                                    <div v-if="role === 'staff'" class="mt-auto">
+                        <!-- All Treks for Admin to Manage -->
+                        <h4 class="fw-bold text-forest mb-3">Active Trails</h4>
+                        <div class="row">
+                            <div class="col-md-6 col-lg-4 mb-4" v-for="t in filteredTreks" :key="t.id">
+                                <div class="card trek-card h-100 shadow-sm border-0">
+                                    <div class="card-body d-flex flex-column">
                                         <div class="mb-2">
-                                            <label class="form-label mb-1 text-muted"><small>Available Slots:</small></label>
-                                            <input type="number" v-model.number="t.available_slots" class="form-control form-control-sm mb-2" required>
+                                            <span class="badge bg-forest status-badge">{{ t.difficulty }}</span>
+                                            <span class="badge bg-secondary status-badge ms-2" v-if="t.status !== 'Open'">{{ t.status }}</span>
+                                            <span class="badge bg-success status-badge ms-2" v-else>Open</span>
                                         </div>
-                                        <div class="mb-3">
-                                            <label class="form-label mb-1 text-muted"><small>Status:</small></label>
-                                            <select v-model="t.status" class="form-select form-select-sm">
-                                                <option value="Open">Open</option>
-                                                <option value="Closed">Closed</option>
-                                                <option value="Completed">Completed</option>
-                                            </select>
-                                        </div>
-                                        <div class="d-grid gap-2">
-                                            <button @click="manageTrekSlots(t)" class="btn btn-sm btn-primary fw-bold">Update Trek</button>
-                                            <button @click="fetchParticipants(t.id)" class="btn btn-sm btn-outline-info fw-bold">View Participants</button>
-                                        </div>
-                                    </div>
+                                        
+                                        <h5 class="card-title fw-bold">{{ t.name }}</h5>
+                                        <h6 class="card-subtitle mb-3 text-muted">📍 {{ t.location }}</h6>
+                                        
+                                        <p class="card-text mb-1"><small><strong>Slots:</strong> {{ t.available_slots }} / {{ t.total_capacity }}</small></p>
+                                        <p class="card-text mb-3"><small><strong>Dates:</strong> {{ t.start_date }} to {{ t.end_date }}</small></p>
 
-                                    <!-- Trekker Actions -->
-                                    <div v-if="role === 'trekker'" class="d-grid mt-auto">
-                                        <button v-if="t.status === 'Open' && t.available_slots > 0" @click="bookTrek(t.id)" class="btn btn-energetic">Book Now</button>
-                                        <button v-else class="btn btn-secondary" disabled>Unavailable</button>
-                                    </div>
-
-                                    <!-- Admin Assignment Dropdown -->
-                                    <div v-if="role === 'admin'" class="mt-auto pt-3 border-top">
-                                        <div class="input-group input-group-sm">
-                                            <select class="form-select text-truncate" v-model="t.selectedStaff">
-                                                <option disabled value="">Assign staff...</option>
-                                                <option v-for="s in staffList" :value="s.id">{{ s.name }} ({{ s.email }})</option>
-                                            </select>
-                                            <button @click="assignStaff(t.id, t.selectedStaff)" class="btn btn-forest bg-forest text-white">Assign</button>
+                                        <div class="mt-auto pt-3 border-top">
+                                            <div class="input-group input-group-sm">
+                                                <select class="form-select text-truncate" v-model="t.selectedStaff">
+                                                    <option disabled value="">Assign staff...</option>
+                                                    <option v-for="s in staffList" :value="s.id">{{ s.name }} ({{ s.email }})</option>
+                                                </select>
+                                                <button @click="assignStaff(t.id, t.selectedStaff)" class="btn btn-forest bg-forest text-white">Assign</button>
+                                            </div>
+                                            <div v-if="t.staff_id" class="mt-2 text-muted mb-2"><small>Staff ID Assigned: {{ t.staff_id }}</small></div>
+                                            <button @click="deleteTrek(t.id)" class="btn btn-sm btn-danger w-100 mt-2">Remove Trek</button>
                                         </div>
-                                        <div v-if="t.staff_id" class="mt-2 text-muted mb-2"><small>Staff ID Assigned: {{ t.staff_id }}</small></div>
-                                        <button @click="deleteTrek(t.id)" class="btn btn-sm btn-danger w-100 mt-2">Remove Trek</button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </template>
-                </div>
+                    </div>
 
-                <!-- Participants List for Selected Trek (Staff / Admin) -->
-                <div id="participants-section" v-if="participants.length > 0" class="card shadow-sm mb-5 border-0 rounded-3">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="fw-bold text-forest mb-0">Registered Participants</h4>
-                            <button @click="participants = []" class="btn btn-sm btn-outline-secondary">Close View</button>
+                    <!-- Admin Manage Users & Staff View -->
+                    <div v-if="currentView === 'users' && role === 'admin'">
+                        <div class="card shadow-sm p-4 border-0 rounded-3 mb-4">
+                            <h4 class="fw-bold text-forest mb-3">Create Trek Staff Account</h4>
+                            <form @submit.prevent="createStaff">
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <input v-model="newStaff.name" class="form-control" placeholder="Staff Name" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="email" class="form-control" v-model="newStaff.email" placeholder="Staff Email" required>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="password" class="form-control" v-model="newStaff.password" placeholder="Password" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-forest bg-forest text-white w-100 fw-bold">Add Staff</button>
+                                    </div>
+                                </div>
+                            </form>
                         </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Trekker Name</th>
-                                        <th>Email</th>
-                                        <th>Phone</th>
-                                        <th>Booking Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="p in participants">
-                                        <td class="fw-bold">{{ p.name }}</td>
-                                        <td>{{ p.email }}</td>
-                                        <td>{{ p.phone || 'N/A' }}</td>
-                                        <td>{{ p.date }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+
+                        <!-- User Management Table -->
+                        <div class="card shadow-sm border-0 rounded-3">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+                                    <h4 class="fw-bold text-forest mb-2">Manage Users & Staff</h4>
+                                    <div class="col-md-4">
+                                        <input type="text" v-model="searchUserQuery" class="form-control form-control-sm shadow-sm" placeholder="🔍 Search users by name/email...">
+                                    </div>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Name</th>
+                                                <th>Email</th>
+                                                <th>Role</th>
+                                                <th>Status</th>
+                                                <th>Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-if="filteredUsers.length === 0">
+                                                <td colspan="5" class="text-center text-muted py-4">No users found.</td>
+                                            </tr>
+                                            <tr v-for="u in filteredUsers" :key="u.id">
+                                                <td class="fw-bold">{{ u.name }}</td>
+                                                <td>{{ u.email }}</td>
+                                                <td><span class="badge bg-secondary">{{ u.role.toUpperCase() }}</span></td>
+                                                <td>
+                                                    <span v-if="u.is_active" class="badge bg-success">Active</span>
+                                                    <span v-else class="badge bg-danger">Blacklisted</span>
+                                                </td>
+                                                <td>
+                                                    <button @click="toggleUser(u.id)" class="btn btn-sm" :class="u.is_active ? 'btn-outline-danger' : 'btn-outline-success'">
+                                                        {{ u.is_active ? 'Blacklist' : 'Activate' }}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Historical Bookings View -->
+                    <div v-if="currentView === 'bookings' && role === 'admin'">
+                        <div class="card shadow-sm border-0 rounded-3">
+                            <div class="card-body">
+                                <h4 class="fw-bold text-forest mb-3">All Historical Bookings</h4>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Booking ID</th>
+                                                <th>Trekker Name</th>
+                                                <th>Trek Name</th>
+                                                <th>Booking Date</th>
+                                                <th>Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-if="allBookings.length === 0">
+                                                <td colspan="5" class="text-center text-muted py-4">No bookings found.</td>
+                                            </tr>
+                                            <tr v-for="b in allBookings" :key="b.id">
+                                                <td>#{{ b.id }}</td>
+                                                <td class="fw-bold">{{ b.user_name }}</td>
+                                                <td>{{ b.trek_name }}</td>
+                                                <td>{{ b.date }}</td>
+                                                <td>
+                                                    <span class="badge bg-success" v-if="b.status === 'Booked'">Booked</span>
+                                                    <span class="badge bg-secondary" v-else>{{ b.status }}</span>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trekker Explore View -->
+                    <div v-if="currentView === 'explore' && role === 'trekker'">
+                        <!-- Search Bar & Filters -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <input type="text" v-model="searchQuery" class="form-control shadow-sm border-0" placeholder="🔍 Search treks by name, location, or difficulty...">
+                            </div>
+                            <div class="col-md-3">
+                                <select v-model="filterDifficulty" class="form-select shadow-sm border-0">
+                                    <option value="">All Difficulties</option>
+                                    <option value="Easy">Easy</option>
+                                    <option value="Moderate">Moderate</option>
+                                    <option value="Hard">Hard</option>
+                                </select>
+                            </div>
+                            <div class="col-md-3">
+                                <input type="number" v-model.number="filterDuration" class="form-control shadow-sm border-0" placeholder="Max Duration (Days)">
+                            </div>
+                        </div>
+
+                        <!-- Available Treks -->
+                        <h3 class="fw-bold text-forest mb-4">Available Treks</h3>
+                        <div class="row">
+                            <div class="col-md-6 col-lg-4 mb-4" v-for="t in filteredTreks" :key="t.id">
+                                <div class="card trek-card h-100 shadow-sm border-0">
+                                    <div class="card-body d-flex flex-column">
+                                        <div class="mb-2">
+                                            <span class="badge bg-forest status-badge">{{ t.difficulty }}</span>
+                                            <span class="badge bg-success status-badge ms-2" v-if="t.status === 'Open'">Open</span>
+                                            <span class="badge bg-secondary status-badge ms-2" v-else>{{ t.status }}</span>
+                                        </div>
+                                        
+                                        <h5 class="card-title fw-bold">{{ t.name }}</h5>
+                                        <h6 class="card-subtitle mb-3 text-muted">📍 {{ t.location }}</h6>
+                                        
+                                        <p class="card-text mb-1"><small><strong>Slots:</strong> {{ t.available_slots }} / {{ t.total_capacity }}</small></p>
+                                        <p class="card-text mb-3"><small><strong>Dates:</strong> {{ t.start_date }} to {{ t.end_date }}</small></p>
+
+                                        <div class="d-grid mt-auto">
+                                            <button v-if="t.status === 'Open' && t.available_slots > 0" @click="bookTrek(t.id)" class="btn btn-energetic">Book Now</button>
+                                            <button v-else class="btn btn-secondary" disabled>Unavailable</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Trekker Bookings View -->
+                    <div v-if="currentView === 'bookings' && role === 'trekker'">
+                        <!-- Export Actions -->
+                        <div class="mb-4 d-flex align-items-center flex-wrap gap-2">
+                            <button @click="exportHistory" class="btn btn-outline-secondary">⬇ Export Booking History (CSV)</button>
+                            <span v-if="exportStatus" class="ms-2 badge bg-secondary p-2">{{ exportStatus }}</span>
+                            <a v-if="exportFileUrl" :href="exportFileUrl" class="btn btn-sm btn-success fw-bold ms-2" target="_blank">Download CSV File</a>
+                        </div>
+
+                        <!-- Booking History -->
+                        <h4 class="fw-bold text-forest mb-3">My Booking History</h4>
+                        <div class="card shadow-sm border-0 rounded-3">
+                            <div class="table-responsive">
+                                <table class="table table-hover align-middle mb-0">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Trek Name</th>
+                                            <th>Booking Date</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="b in history" :key="b.id">
+                                            <td class="fw-bold">{{ b.trek_name }}</td>
+                                            <td>{{ b.date }}</td>
+                                            <td>
+                                                <span class="badge bg-success" v-if="b.status === 'Booked'">Booked</span>
+                                                <span class="badge bg-danger" v-else-if="b.status === 'Cancelled'">Cancelled</span>
+                                                <span class="badge bg-secondary" v-else>{{ b.status }}</span>
+                                            </td>
+                                            <td>
+                                                <button v-if="b.status === 'Booked'" @click="cancelBooking(b.id)" class="btn btn-sm btn-outline-danger">Cancel</button>
+                                            </td>
+                                        </tr>
+                                        <tr v-if="history.length === 0">
+                                            <td colspan="4" class="text-center text-muted py-4">No bookings found. Start exploring above!</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Staff Assigned Treks View -->
+                    <div v-if="currentView === 'treks' && role === 'staff'">
+                        <h3 class="fw-bold text-forest mb-4">My Assigned Treks</h3>
+                        <div class="row">
+                            <template v-for="t in filteredTreks" :key="t.id">
+                                <div class="col-md-6 col-lg-4 mb-4" v-if="t.staff_id == userId">
+                                    <div class="card trek-card h-100 shadow-sm border-0">
+                                        <div class="card-body d-flex flex-column">
+                                            <div class="mb-2">
+                                                <span class="badge bg-forest status-badge">{{ t.difficulty }}</span>
+                                                <span class="badge bg-secondary status-badge ms-2" v-if="t.status !== 'Open'">{{ t.status }}</span>
+                                                <span class="badge bg-success status-badge ms-2" v-else>Open</span>
+                                            </div>
+                                            
+                                            <h5 class="card-title fw-bold">{{ t.name }}</h5>
+                                            <h6 class="card-subtitle mb-3 text-muted">📍 {{ t.location }}</h6>
+                                            
+                                            <p class="card-text mb-1"><small><strong>Slots:</strong> {{ t.available_slots }} / {{ t.total_capacity }}</small></p>
+                                            <p class="card-text mb-3"><small><strong>Dates:</strong> {{ t.start_date }} to {{ t.end_date }}</small></p>
+
+                                            <div class="mt-auto">
+                                                <div class="mb-2">
+                                                    <label class="form-label mb-1 text-muted"><small>Available Slots:</small></label>
+                                                    <input type="number" v-model.number="t.available_slots" class="form-control form-control-sm mb-2" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label class="form-label mb-1 text-muted"><small>Status:</small></label>
+                                                    <select v-model="t.status" class="form-select form-select-sm">
+                                                        <option value="Open">Open</option>
+                                                        <option value="Closed">Closed</option>
+                                                        <option value="Completed">Completed</option>
+                                                    </select>
+                                                </div>
+                                                <div class="d-grid gap-2">
+                                                    <button @click="manageTrekSlots(t)" class="btn btn-sm btn-primary fw-bold">Update Trek</button>
+                                                    <button @click="fetchParticipants(t.id)" class="btn btn-sm btn-outline-info fw-bold">View Participants</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Participants List for Selected Trek -->
+                        <div id="participants-section" v-if="participants.length > 0" class="card shadow-sm border-0 rounded-3 mt-4">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h4 class="fw-bold text-forest mb-0">Registered Participants</h4>
+                                    <button @click="participants = []" class="btn btn-sm btn-outline-secondary">Close View</button>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Trekker Name</th>
+                                                <th>Email</th>
+                                                <th>Phone</th>
+                                                <th>Booking Date</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-for="p in participants">
+                                                <td class="fw-bold">{{ p.name }}</td>
+                                                <td>{{ p.email }}</td>
+                                                <td>{{ p.phone || 'N/A' }}</td>
+                                                <td>{{ p.date }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- Trekker Booking History Table -->
-                <div v-if="role === 'trekker'" class="mt-5 mb-5">
-                    <hr>
-                    <h4 class="fw-bold text-forest mb-3">My Booking History</h4>
-                    <div class="card shadow-sm border-0 rounded-3">
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle mb-0">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Trek Name</th>
-                                        <th>Booking Date</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="b in history" :key="b.id">
-                                        <td class="fw-bold">{{ b.trek_name }}</td>
-                                        <td>{{ b.date }}</td>
-                                        <td>
-                                            <span class="badge bg-success" v-if="b.status === 'Booked'">Booked</span>
-                                            <span class="badge bg-danger" v-else-if="b.status === 'Cancelled'">Cancelled</span>
-                                            <span class="badge bg-secondary" v-else>{{ b.status }}</span>
-                                        </td>
-                                        <td>
-                                            <button v-if="b.status === 'Booked'" @click="cancelBooking(b.id)" class="btn btn-sm btn-outline-danger">Cancel</button>
-                                        </td>
-                                    </tr>
-                                    <tr v-if="history.length === 0">
-                                        <td colspan="4" class="text-center text-muted py-4">No bookings found. Start exploring above!</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
             </div>
         </div>
     </div>

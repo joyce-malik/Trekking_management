@@ -25,7 +25,8 @@ createApp({
             searchUserQuery: '',
             exportStatus: null,
             exportFileUrl: null,
-            publicStats: { active_treks: 0, happy_trekkers: 0 }
+            publicStats: { active_treks: 0, happy_trekkers: 0 },
+            currentView: ''
         }
     },
     computed: {
@@ -73,6 +74,7 @@ createApp({
             .then(res => res.json())
             .then(data => this.publicStats = data);
         if (this.token) {
+            this.currentView = this.role === 'admin' ? 'dashboard' : (this.role === 'staff' ? 'treks' : 'explore');
             this.fetchTreks();
             if (this.role === 'admin') {
                 this.fetchStaffList();
@@ -90,6 +92,16 @@ createApp({
         }
     },
     methods: {
+        setView(view) {
+            this.currentView = view;
+            this.errorMessage = '';
+            this.successMessage = '';
+            if (view === 'dashboard' && this.role === 'admin') {
+                this.$nextTick(() => {
+                    this.fetchStats();
+                });
+            }
+        },
         async login() {
             const res = await fetch('http://127.0.0.1:5000/api/login', {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -98,6 +110,7 @@ createApp({
             const data = await res.json();
             if (res.ok) {
                 this.token = data.access_token; this.role = data.role; this.userId = data.user_id;
+                this.currentView = this.role === 'admin' ? 'dashboard' : (this.role === 'staff' ? 'treks' : 'explore');
                 localStorage.setItem('access_token', this.token);
                 localStorage.setItem('role', this.role);
                 localStorage.setItem('user_id', this.userId);
@@ -137,6 +150,7 @@ createApp({
         logout() {
             this.token = null; this.role = null; this.userId = null; this.treks = []; this.staffList = []; this.history = [];
             this.users = []; this.searchQuery = '';
+            this.currentView = '';
             this.stats = { total_treks: 0, total_users: 0, total_bookings: 0 };
             localStorage.clear();
         },

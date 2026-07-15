@@ -16,7 +16,8 @@ from email.mime.multipart import MIMEMultipart
 
 
 
-app = Flask(__name__)
+backend_dir = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__, instance_path=os.path.join(backend_dir, 'instance'))
 
 # Basic Config
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tma.db'
@@ -430,8 +431,10 @@ celery.conf.beat_schedule = {
     },
     'monthly-activity-report': {
         'task': 'app.send_monthly_report',
-        # Runs on the 1st of every month at midnight
-        'schedule': crontab(day_of_month='1', hour=0, minute=0), 
+        # Runs on the 1st of every month at 8:00 AM
+        'schedule': crontab(day_of_month='1', hour=8, minute=0), 
+        
+        # 'schedule': crontab(minute='*'), 
     }
 }
 

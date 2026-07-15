@@ -389,6 +389,7 @@ def get_stats():
     return jsonify({
         "total_treks": Trek.query.count(),
         "total_users": User.query.filter_by(role='trekker').count(),
+        "total_staff": User.query.filter_by(role='staff').count(),
         "total_bookings": Booking.query.count()
     }), 200
 

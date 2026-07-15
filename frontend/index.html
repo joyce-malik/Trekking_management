@@ -78,19 +78,25 @@
 
                 <!-- Admin Stats Section -->
                 <div v-if="role === 'admin'" class="row mb-5 text-center">
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card shadow-sm p-3 bg-white border-0 border-start border-primary border-4 fw-bold text-forest">
                             <small class="text-muted d-block text-uppercase">Total Treks</small>
                             <span class="fs-3">{{ stats.total_treks }}</span>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
                         <div class="card shadow-sm p-3 bg-white border-0 border-start border-success border-4 fw-bold text-forest">
                             <small class="text-muted d-block text-uppercase">Trekkers Registered</small>
                             <span class="fs-3">{{ stats.total_users }}</span>
                         </div>
                     </div>
-                    <div class="col-md-4">
+                    <div class="col-md-3">
+                        <div class="card shadow-sm p-3 bg-white border-0 border-start border-info border-4 fw-bold text-forest">
+                            <small class="text-muted d-block text-uppercase">Trekking Staff</small>
+                            <span class="fs-3">{{ stats.total_staff }}</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
                         <div class="card shadow-sm p-3 bg-white border-0 border-start border-warning border-4 fw-bold text-forest">
                             <small class="text-muted d-block text-uppercase">Total Bookings</small>
                             <span class="fs-3">{{ stats.total_bookings }}</span>

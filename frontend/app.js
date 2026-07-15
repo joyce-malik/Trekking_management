@@ -12,7 +12,7 @@ createApp({
             treks: [],
             staffList: [],
             history: [],
-            stats: { total_treks: 0, total_users: 0, total_bookings: 0 },
+            stats: { total_treks: 0, total_users: 0, total_staff: 0, total_bookings: 0 },
             newTrek: { name: '', location: '', difficulty: '', duration: '', total_capacity: '', start_date: '', end_date: '' },
             newStaff: { name: '', email: '', password: '' },
             users: [],
